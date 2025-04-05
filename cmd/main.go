@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/edisss1/fiabesco-backend/db"
 	"github.com/edisss1/fiabesco-backend/handlers/auth"
+	"github.com/edisss1/fiabesco-backend/handlers/post"
 	"log"
 	"os"
 
@@ -21,8 +22,10 @@ func main() {
 
 	PORT := os.Getenv("PORT")
 
-	app.Post("/signup", auth.SignUp)
-	app.Post("/login", auth.Login)
+	app.Post("/auth/signup", auth.SignUp)
+	app.Post("/auth/login", auth.Login)
+	app.Post("/user/:_id/post/create", post.CreatePost)
+	app.Get("/user/:_id/post/get-all", post.GetPostsByUser)
 
 	if PORT == "" {
 		PORT = "3000"
