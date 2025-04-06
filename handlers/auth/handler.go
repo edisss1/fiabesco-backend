@@ -52,6 +52,8 @@ func SignUp(c *fiber.Ctx) error {
 		HTTPOnly: true,
 	})
 
+	input.Token = token
+
 	return c.Status(201).JSON(input)
 }
 

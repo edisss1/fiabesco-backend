@@ -11,6 +11,7 @@ type User struct {
 	LastName       string             `json:"lastName"`
 	Email          string             `json:"email"`
 	Password       string             `json:"password"`
+	Token          string             `json:"token"`
 	PhotoURL       string             `json:"photoURL"`
 	BannerURL      string             `json:"bannerURL"`
 	FollowersCount uint32             `json:"followersCount"`
