@@ -133,7 +133,11 @@ func GetFeedPosts(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch posts"})
 	}
 
-	defer cursor.Close(context.Background())
+	defer func() {
+		if err := cursor.Close(context.Background()); err != nil {
+			log.Fatal(err)
+		}
+	}()
 
 	for cursor.Next(context.Background()) {
 		var post types.Post
