@@ -26,6 +26,8 @@ func main() {
 	app.Post("/auth/login", auth.Login)
 	app.Post("/user/:_id/post/create", post.CreatePost)
 	app.Get("/user/:_id/post/get-all", post.GetPostsByUser)
+	app.Delete("/user/:_id/post/delete/:postID", post.DeletePost)
+	app.Get("/post/get-feed", post.GetFeedPosts)
 
 	if PORT == "" {
 		PORT = "3000"
