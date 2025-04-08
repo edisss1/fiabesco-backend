@@ -24,10 +24,11 @@ func main() {
 
 	app.Post("/auth/signup", auth.SignUp)
 	app.Post("/auth/login", auth.Login)
-	app.Post("/user/:_id/post/create", post.CreatePost)
-	app.Get("/user/:_id/post/get-all", post.GetPostsByUser)
-	app.Delete("/user/:_id/post/delete/:postID", post.DeletePost)
-	app.Get("/post/get-feed", post.GetFeedPosts)
+	app.Post("/users/:_id/posts", post.CreatePost)
+	app.Get("/users/:_id/post", post.GetPostsByUser)
+	app.Delete("/users/:_id/posts/:postID", post.DeletePost)
+	app.Get("/posts/feed", post.GetFeedPosts)
+	app.Patch("/posts/:_id", post.UpdatePostCaption)
 
 	if PORT == "" {
 		PORT = "3000"

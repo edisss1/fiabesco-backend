@@ -124,7 +124,7 @@ func GetFeedPosts(c *fiber.Ctx) error {
 	skip, _ := strconv.Atoi(skipParam)
 
 	collection = db.Database.Collection("posts")
-	opts := options.Find().SetLimit(int64(limit)).SetSkip(int64(skip))
+	opts := options.Find().SetLimit(int64(limit)).SetSkip(int64(skip)).SetSort(bson.D{{Key: "createdAt", Value: -1}})
 
 	var posts []types.Post
 
@@ -148,4 +148,36 @@ func GetFeedPosts(c *fiber.Ctx) error {
 	}
 
 	return c.Status(200).JSON(posts)
+}
+
+func UpdatePostCaption(c *fiber.Ctx) error {
+	id := c.Params("_id")
+
+	var body struct {
+		Caption string `json:"caption"`
+	}
+
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	if body.Caption == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Caption is required"})
+	}
+
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid ID"})
+	}
+
+	collection := db.Database.Collection("posts")
+	filter := bson.M{"_id": objectID}
+	update := bson.M{"$set": bson.M{"caption": body.Caption}}
+
+	_, err = collection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return err
+	}
+
+	return c.Status(200).JSON(fiber.Map{"msg": "Post updated successfully"})
 }
