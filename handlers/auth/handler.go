@@ -26,7 +26,7 @@ func SignUp(c *fiber.Ctx) error {
 
 	err := collection.FindOne(context.Background(), filter).Decode(&existingUser)
 
-	if err != nil {
+	if err == nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Invalid credentials"})
 	}
 

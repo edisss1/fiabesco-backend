@@ -4,6 +4,7 @@ import (
 	"github.com/edisss1/fiabesco-backend/db"
 	"github.com/edisss1/fiabesco-backend/handlers/auth"
 	"github.com/edisss1/fiabesco-backend/handlers/post"
+	"github.com/edisss1/fiabesco-backend/handlers/user"
 	"log"
 	"os"
 
@@ -29,6 +30,7 @@ func main() {
 	app.Delete("/users/:_id/posts/:postID", post.DeletePost)
 	app.Get("/posts/feed", post.GetFeedPosts)
 	app.Patch("/posts/:_id", post.UpdatePostCaption)
+	app.Patch("/users/:_id/photo", user.UpdatePhotoURL)
 
 	if PORT == "" {
 		PORT = "3000"

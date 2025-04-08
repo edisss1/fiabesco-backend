@@ -7,19 +7,19 @@ import (
 
 type User struct {
 	ID             primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
-	FirstName      string             `json:"firstName"`
-	LastName       string             `json:"lastName"`
-	Email          string             `json:"email"`
-	Password       string             `json:"password"`
-	Token          string             `json:"token"`
-	PhotoURL       string             `json:"photoURL"`
-	BannerURL      string             `json:"bannerURL"`
-	FollowersCount uint32             `json:"followersCount"`
-	FollowingCount uint32             `json:"followingCount"`
-	Bio            string             `json:"bio"`
-	FollowedBy     []string           `json:"followed_by"`
-	FollowedUsers  []string           `json:"followedUsers"`
-	CreatedAt      time.Time          `json:"createdAt"`
+	FirstName      string             `json:"firstName" bson:"firstName"`
+	LastName       string             `json:"lastName" bson:"lastName"`
+	Email          string             `json:"email" bson:"email"`
+	Password       string             `json:"password" bson:"password"`
+	Token          string             `json:"token" bson:"token"`
+	PhotoURL       string             `json:"photoURL" bson:"photoURL"`
+	BannerURL      string             `json:"bannerURL" bson:"bannerURL"`
+	FollowersCount uint32             `json:"followersCount" bson:"followersCount"`
+	FollowingCount uint32             `json:"followingCount" bson:"followingCount"`
+	Bio            string             `json:"bio" bson:"bio"`
+	FollowedBy     []string           `json:"followedBy" bson:"followedBy"`
+	FollowedUsers  []string           `json:"followedUsers" bson:"followedUsers"`
+	CreatedAt      time.Time          `json:"createdAt" bson:"createdAt"`
 }
 
 type Post struct {
