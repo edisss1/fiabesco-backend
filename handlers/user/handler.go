@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"github.com/edisss1/fiabesco-backend/db"
+	"github.com/edisss1/fiabesco-backend/types"
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -10,6 +11,33 @@ import (
 )
 
 var collection *mongo.Collection
+
+func GetUserData(c *fiber.Ctx) error {
+	var body struct {
+		Email string `json:"email"`
+	}
+
+	var user types.User
+
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Invalid credentials"})
+	}
+
+	if body.Email == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Body is required"})
+	}
+
+	collection = db.Database.Collection("users")
+	filter := bson.M{"email": body.Email}
+
+	err := collection.FindOne(context.Background(), filter).Decode(&user)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid credentials"})
+	}
+	user.Password = ""
+
+	return c.Status(200).JSON(user)
+}
 
 func UpdatePhotoURL(c *fiber.Ctx) error {
 	id := c.Params("_id")
