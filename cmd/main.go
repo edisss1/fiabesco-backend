@@ -5,6 +5,7 @@ import (
 	"github.com/edisss1/fiabesco-backend/handlers/auth"
 	"github.com/edisss1/fiabesco-backend/handlers/post"
 	"github.com/edisss1/fiabesco-backend/handlers/user"
+	"github.com/edisss1/fiabesco-backend/middleware"
 	"log"
 	"os"
 
@@ -25,12 +26,12 @@ func main() {
 
 	app.Post("/auth/signup", auth.SignUp)
 	app.Post("/auth/login", auth.Login)
-	app.Post("/users/:_id/posts", post.CreatePost)
-	app.Get("/users/:_id/post", post.GetPostsByUser)
-	app.Delete("/users/:_id/posts/:postID", post.DeletePost)
-	app.Get("/posts/feed", post.GetFeedPosts)
-	app.Patch("/posts/:_id", post.UpdatePostCaption)
-	app.Patch("/users/:_id/photo", user.UpdatePhotoURL)
+	app.Post("/users/:_id/posts", middleware.RequireJWT, post.CreatePost)
+	app.Get("/users/:_id/post", middleware.RequireJWT, post.GetPostsByUser)
+	app.Delete("/users/:_id/posts/:postID", middleware.RequireJWT, post.DeletePost)
+	app.Get("/posts/feed", middleware.RequireJWT, post.GetFeedPosts)
+	app.Patch("/posts/:_id", middleware.RequireJWT, post.UpdatePostCaption)
+	app.Patch("/users/:_id/photo", middleware.RequireJWT, user.UpdatePhotoURL)
 
 	if PORT == "" {
 		PORT = "3000"
