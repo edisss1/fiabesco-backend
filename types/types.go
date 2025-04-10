@@ -11,6 +11,7 @@ type User struct {
 	LastName       string             `json:"lastName" bson:"lastName"`
 	Email          string             `json:"email" bson:"email"`
 	Password       string             `json:"password" bson:"password"`
+	Handle         string             `json:"handle"`
 	Token          string             `json:"token" bson:"token"`
 	PhotoURL       string             `json:"photoURL" bson:"photoURL"`
 	BannerURL      string             `json:"bannerURL" bson:"bannerURL"`
