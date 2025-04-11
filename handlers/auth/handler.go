@@ -8,6 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"time"
 )
 
 var collection *mongo.Collection
@@ -35,6 +36,7 @@ func SignUp(c *fiber.Ctx) error {
 	hash := HashPassword(input.Password)
 	input.Password = hash
 	input.Handle = handle
+	input.CreatedAt = time.Now()
 
 	_, err = collection.InsertOne(context.Background(), input)
 	if err != nil {
