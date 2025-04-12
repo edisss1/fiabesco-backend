@@ -39,6 +39,7 @@ func main() {
 	app.Get("/posts/feed", middleware.RequireJWT, post.GetFeedPosts)
 	app.Patch("/posts/:_id", middleware.RequireJWT, post.UpdatePostCaption)
 	app.Patch("/users/:_id/photo", middleware.RequireJWT, user.UpdatePhotoURL)
+	app.Get("/users/profile/:_id", middleware.RequireJWT, user.GetProfileData)
 
 	if PORT == "" {
 		PORT = "3000"

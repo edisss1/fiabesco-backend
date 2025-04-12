@@ -26,6 +26,10 @@ type User struct {
 type Post struct {
 	ID            primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
 	UserID        primitive.ObjectID `json:"userID,omitempty" bson:"userID"`
+	UserFirstName string             `json:"userFirstName" bson:"userFirstName"`
+	UserLastName  string             `json:"userLastName" bson:"userLastName"`
+	UserPhotoURL  string             `json:"userPhotoURL" bson:"userPhotoURL"`
+	UserHandle    string             `json:"userHandle" bson:"userHandle"`
 	Caption       string             `json:"caption"`
 	Images        []string           `json:"images"`
 	Tags          []string           `json:"tags"`

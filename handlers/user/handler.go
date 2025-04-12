@@ -68,3 +68,30 @@ func UpdatePhotoURL(c *fiber.Ctx) error {
 
 	return c.Status(200).JSON(fiber.Map{"msg": "PFP updated successfully"})
 }
+
+func GetProfileData(c *fiber.Ctx) error {
+	id := c.Params("_id")
+	objectID, err := primitive.ObjectIDFromHex(id)
+
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid ID"})
+	}
+
+	var user types.User
+
+	collection = db.Database.Collection("users")
+
+	filter := bson.M{"_id": objectID}
+
+	err = collection.FindOne(context.Background(), filter).Decode(&user)
+
+	user.Password = ""
+	user.Email = ""
+
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "User not found"})
+	}
+
+	return c.Status(200).JSON(user)
+
+}
