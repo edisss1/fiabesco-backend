@@ -47,6 +47,10 @@ func CreatePost(c *fiber.Ctx) error {
 
 	post.CreatedAt = time.Now()
 	post.UpdatedAt = time.Now()
+	post.UserFirstName = user.FirstName
+	post.UserLastName = user.LastName
+	post.UserHandle = user.Handle
+	post.UserPhotoURL = user.PhotoURL
 
 	_, err = postsCollection.InsertOne(context.Background(), post)
 
@@ -54,7 +58,7 @@ func CreatePost(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "An error occurred"})
 	}
 
-	return c.Status(201).JSON(fiber.Map{"msg": "Post created", "post": post})
+	return c.Status(201).JSON(post)
 }
 
 func GetPostsByUser(c *fiber.Ctx) error {
