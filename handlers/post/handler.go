@@ -117,34 +117,66 @@ func DeletePost(c *fiber.Ctx) error {
 }
 
 func GetFeedPosts(c *fiber.Ctx) error {
+	sampleSizeParam := c.Query("sample", "10")
 	limitParam := c.Query("limit", "10")
 	skipParam := c.Query("skip", "0")
 
+	sampleSize, _ := strconv.Atoi(sampleSizeParam)
 	limit, _ := strconv.Atoi(limitParam)
 	skip, _ := strconv.Atoi(skipParam)
 
 	collection = db.Database.Collection("posts")
-	opts := options.Find().SetLimit(int64(limit)).SetSkip(int64(skip)).SetSort(bson.D{{Key: "createdAt", Value: -1}})
 
 	var posts []types.Post
 
-	cursor, err := collection.Find(context.Background(), bson.M{}, opts)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch posts"})
-	}
-
-	defer func() {
-		if err := cursor.Close(context.Background()); err != nil {
-			log.Fatal(err)
+	if sampleSize > 0 {
+		pipeline := []bson.M{
+			{"$sample": bson.M{"size": sampleSize}},
+			{"$skip": skip},
+			{"$limit": limit},
+			{"$sort": bson.M{"createdAt": -1}},
 		}
-	}()
 
-	for cursor.Next(context.Background()) {
-		var post types.Post
-		if err := cursor.Decode(&post); err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to decode post"})
+		cursor, err := collection.Aggregate(context.Background(), pipeline)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch posts"})
 		}
-		posts = append(posts, post)
+
+		defer func() {
+			if err := cursor.Close(context.Background()); err != nil {
+				log.Fatal(err)
+			}
+		}()
+
+		for cursor.Next(context.Background()) {
+			var post types.Post
+			if err := cursor.Decode(&post); err != nil {
+				return c.Status(500).JSON(fiber.Map{"error": "Failed to decode post"})
+			}
+			posts = append(posts, post)
+		}
+
+	} else {
+		opts := options.Find().SetLimit(int64(limit)).SetSkip(int64(skip)).SetSort(bson.D{{Key: "createdAt", Value: -1}})
+
+		cursor, err := collection.Find(context.Background(), bson.M{}, opts)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch posts"})
+		}
+
+		defer func() {
+			if err := cursor.Close(context.Background()); err != nil {
+				log.Fatal(err)
+			}
+		}()
+
+		for cursor.Next(context.Background()) {
+			var post types.Post
+			if err := cursor.Decode(&post); err != nil {
+				return c.Status(500).JSON(fiber.Map{"error": "Failed to decode post"})
+			}
+			posts = append(posts, post)
+		}
 	}
 
 	return c.Status(200).JSON(posts)
