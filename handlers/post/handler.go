@@ -121,7 +121,7 @@ func DeletePost(c *fiber.Ctx) error {
 }
 
 func GetFeedPosts(c *fiber.Ctx) error {
-	sampleSizeParam := c.Query("sample", "10")
+	sampleSizeParam := c.Query("sample", "0") // Default to 0 (no sampling)
 	limitParam := c.Query("limit", "10")
 	skipParam := c.Query("skip", "0")
 
@@ -129,28 +129,25 @@ func GetFeedPosts(c *fiber.Ctx) error {
 	limit, _ := strconv.Atoi(limitParam)
 	skip, _ := strconv.Atoi(skipParam)
 
-	collection = db.Database.Collection("posts")
-
+	collection := db.Database.Collection("posts")
 	var posts []types.Post
 
 	if sampleSize > 0 {
+
+		effectiveSampleSize := sampleSize + skip + limit
+
 		pipeline := []bson.M{
-			{"$sample": bson.M{"size": sampleSize}},
+			{"$sample": bson.M{"size": effectiveSampleSize}},
+			{"$sort": bson.M{"createdAt": -1}},
 			{"$skip": skip},
 			{"$limit": limit},
-			{"$sort": bson.M{"createdAt": -1}},
 		}
 
 		cursor, err := collection.Aggregate(context.Background(), pipeline)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch posts"})
 		}
-
-		defer func() {
-			if err := cursor.Close(context.Background()); err != nil {
-				log.Fatal(err)
-			}
-		}()
+		defer cursor.Close(context.Background())
 
 		for cursor.Next(context.Background()) {
 			var post types.Post
@@ -159,20 +156,17 @@ func GetFeedPosts(c *fiber.Ctx) error {
 			}
 			posts = append(posts, post)
 		}
-
 	} else {
-		opts := options.Find().SetLimit(int64(limit)).SetSkip(int64(skip)).SetSort(bson.D{{Key: "createdAt", Value: -1}})
+		opts := options.Find().
+			SetLimit(int64(limit)).
+			SetSkip(int64(skip)).
+			SetSort(bson.D{{Key: "createdAt", Value: -1}})
 
 		cursor, err := collection.Find(context.Background(), bson.M{}, opts)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch posts"})
 		}
-
-		defer func() {
-			if err := cursor.Close(context.Background()); err != nil {
-				log.Fatal(err)
-			}
-		}()
+		defer cursor.Close(context.Background())
 
 		for cursor.Next(context.Background()) {
 			var post types.Post
@@ -183,7 +177,23 @@ func GetFeedPosts(c *fiber.Ctx) error {
 		}
 	}
 
-	return c.Status(200).JSON(posts)
+	totalCount, err := collection.CountDocuments(context.Background(), bson.M{})
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count posts"})
+	}
+
+	hasMore := false
+	if sampleSize > 0 {
+		hasMore = len(posts) >= limit
+	} else {
+		hasMore = (skip + limit) < int(totalCount)
+	}
+
+	return c.Status(200).JSON(fiber.Map{
+		"posts":    posts,
+		"hasMore":  hasMore,
+		"nextSkip": skip + limit,
+	})
 }
 
 func UpdatePostCaption(c *fiber.Ctx) error {
