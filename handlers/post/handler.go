@@ -2,7 +2,6 @@ package post
 
 import (
 	"context"
-	"fmt"
 	"github.com/edisss1/fiabesco-backend/db"
 	"github.com/edisss1/fiabesco-backend/types"
 	"github.com/gofiber/fiber/v2"
@@ -32,8 +31,6 @@ func CreatePost(c *fiber.Ctx) error {
 	usersCollection := db.Database.Collection("users")
 
 	err = usersCollection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&user)
-
-	fmt.Println(user)
 
 	if err := c.BodyParser(&post); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})

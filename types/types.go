@@ -42,18 +42,18 @@ type Post struct {
 }
 
 type Message struct {
-	ID          primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
-	SenderID    primitive.ObjectID `json:"senderID" bson:"senderID"`
-	RecipientID primitive.ObjectID `json:"recipientID" bson:"recipientID"`
-	Content     string             `json:"content"`
-	Files       []string           `json:"files"`
-	Read        bool               `json:"read"`
-	CreatedAt   time.Time          `json:"createdAt" bson:"createdAt"`
-	UpdatedAt   time.Time          `json:"updatedAt" bson:"updatedAt"`
+	ID             primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
+	ConversationID primitive.ObjectID `json:"conversationID,omitempty" bson:"conversationID"`
+	SenderID       primitive.ObjectID `json:"senderID" bson:"senderID"`
+	Content        string             `json:"content"`
+	Files          []string           `json:"files"`
+	Read           bool               `json:"read"`
+	CreatedAt      time.Time          `json:"createdAt" bson:"createdAt"`
+	UpdatedAt      time.Time          `json:"updatedAt" bson:"updatedAt"`
 }
 
 type Conversation struct {
-	ID           primitive.ObjectID   `json:"id,omitempty" bson:"id,omitempty"`
+	ID           primitive.ObjectID   `json:"_id,omitempty" bson:"_id,omitempty"`
 	Participants []primitive.ObjectID `json:"participants" bson:"participants"`
 	IsGroup      bool                 `json:"isGroup" bson:"isGroup"`
 	Name         string               `json:"name"`

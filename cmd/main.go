@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/edisss1/fiabesco-backend/db"
 	"github.com/edisss1/fiabesco-backend/handlers/auth"
+	"github.com/edisss1/fiabesco-backend/handlers/messages"
 	"github.com/edisss1/fiabesco-backend/handlers/post"
 	"github.com/edisss1/fiabesco-backend/handlers/user"
 	"github.com/edisss1/fiabesco-backend/middleware"
@@ -40,6 +41,8 @@ func main() {
 	app.Patch("/posts/:_id", middleware.RequireJWT, post.UpdatePostCaption)
 	app.Patch("/users/:_id/photo", middleware.RequireJWT, user.UpdatePhotoURL)
 	app.Get("/users/profile/:_id", middleware.RequireJWT, user.GetProfileData)
+
+	app.Post("/messages/send/:_id", middleware.RequireJWT, messages.SendMessage)
 
 	if PORT == "" {
 		PORT = "3000"
