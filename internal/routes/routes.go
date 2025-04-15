@@ -25,6 +25,7 @@ func userRoutes(app *fiber.App) {
 	app.Post("/users/me", middleware.RequireJWT, user.GetUserData)
 	app.Patch("/users/:_id/photo", middleware.RequireJWT, user.UpdatePhotoURL)
 	app.Get("/users/profile/:_id", middleware.RequireJWT, user.GetProfileData)
+	app.Put("/users/:_id", middleware.RequireJWT, user.BlockUser)
 }
 
 func postRoutes(app *fiber.App) {

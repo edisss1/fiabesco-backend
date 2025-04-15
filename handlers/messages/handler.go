@@ -3,9 +3,9 @@ package messages
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/edisss1/fiabesco-backend/db"
 	"github.com/edisss1/fiabesco-backend/types"
+	"github.com/edisss1/fiabesco-backend/utils"
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -16,11 +16,9 @@ import (
 
 var messagesCollection *mongo.Collection
 var conversationsCollection *mongo.Collection
-
 var usersCollection *mongo.Collection
 
 func StartConversation(c *fiber.Ctx) error {
-
 	conversationsCollection = db.Database.Collection("conversations")
 
 	var payload struct {
@@ -29,16 +27,16 @@ func StartConversation(c *fiber.Ctx) error {
 	}
 
 	if err := c.BodyParser(&payload); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+		return utils.RespondWithError(c, 400, "Invalid request body")
 	}
 
 	senderID, err := primitive.ObjectIDFromHex(payload.SenderID)
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid sender ID"})
+		return utils.RespondWithError(c, 400, "Invalid sender ID")
 	}
 	recipientID, err := primitive.ObjectIDFromHex(payload.RecipientID)
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid recipient ID"})
+		return utils.RespondWithError(c, 400, "Invalid recipient ID")
 	}
 
 	var sender struct {
@@ -52,15 +50,14 @@ func StartConversation(c *fiber.Ctx) error {
 
 	senderFilter := bson.M{"_id": senderID}
 	err = usersCollection.FindOne(context.Background(), senderFilter).Decode(&sender)
-
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid sender ID"})
+		return utils.RespondWithError(c, 400, "Invalid sender ID")
 	}
+
 	recipientFilter := bson.M{"_id": recipientID}
 	err = usersCollection.FindOne(context.Background(), recipientFilter).Decode(&recipient)
-
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid recipient ID"})
+		return utils.RespondWithError(c, 400, "Invalid recipient ID")
 	}
 
 	var conversation types.Conversation
@@ -72,13 +69,12 @@ func StartConversation(c *fiber.Ctx) error {
 	}
 
 	err = conversationsCollection.FindOne(context.Background(), filter).Decode(&conversation)
-
 	if err == nil {
 		return c.JSON(fiber.Map{
 			"conversationID": conversation.ID.Hex(),
 		})
 	} else if !errors.Is(err, mongo.ErrNoDocuments) {
-		return c.Status(500).JSON(fiber.Map{"error": "DB error"})
+		return utils.RespondWithError(c, 500, "DB error")
 	}
 
 	senderFullName := strings.TrimSpace(sender.FirstName + " " + sender.LastName)
@@ -94,11 +90,10 @@ func StartConversation(c *fiber.Ctx) error {
 
 	result, err := conversationsCollection.InsertOne(context.Background(), newConversation)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to create conversation"})
+		return utils.RespondWithError(c, 500, "DB error")
 	}
 
 	return c.Status(201).JSON(fiber.Map{"conversationID": result.InsertedID.(primitive.ObjectID).Hex()})
-
 }
 
 func SendMessage(c *fiber.Ctx) error {
@@ -107,12 +102,12 @@ func SendMessage(c *fiber.Ctx) error {
 
 	conversationID, err := primitive.ObjectIDFromHex(conversationIDParam)
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid conversation ID"})
+		return utils.RespondWithError(c, 400, "Invalid conversation ID")
 	}
 
 	senderID, err := primitive.ObjectIDFromHex(senderIDParam)
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid sender ID"})
+		return utils.RespondWithError(c, 400, "Invalid sender ID")
 	}
 
 	var msg struct {
@@ -120,9 +115,10 @@ func SendMessage(c *fiber.Ctx) error {
 	}
 
 	if err := c.BodyParser(&msg); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+		return utils.RespondWithError(c, 400, "Invalid request body")
 	}
 
+	conversationsCollection = db.Database.Collection("conversations")
 	messagesCollection = db.Database.Collection("messages")
 
 	message := types.Message{
@@ -133,9 +129,22 @@ func SendMessage(c *fiber.Ctx) error {
 		UpdatedAt:      time.Now(),
 	}
 
-	_, err = messagesCollection.InsertOne(context.Background(), message)
+	count, err := conversationsCollection.CountDocuments(context.Background(), bson.M{"_id": conversationID})
+	if err != nil || count == 0 {
+		return utils.RespondWithError(c, 404, "Conversation not found")
+	}
+
+	insertOneResult, err := messagesCollection.InsertOne(context.Background(), message)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to send message"})
+		return utils.RespondWithError(c, 500, "Failed to send message")
+	}
+
+	filter := bson.M{"_id": conversationID}
+	update := bson.M{"$set": bson.M{"lastMessage": insertOneResult.InsertedID}}
+
+	_, err = conversationsCollection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Failed to update conversation")
 	}
 
 	return c.Status(201).JSON(fiber.Map{"msg": "Message sent"})
@@ -149,21 +158,19 @@ func DeleteMessage(c *fiber.Ctx) error {
 	}
 
 	if err := c.BodyParser(&payload); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+		return utils.RespondWithError(c, 400, "Invalid request body")
 	}
 
 	messageID, err := primitive.ObjectIDFromHex(payload.ID)
-	fmt.Printf("Message ID: %v", messageID)
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid ID"})
+		return utils.RespondWithError(c, 400, "Invalid message ID")
 	}
 
 	filter := bson.M{"_id": messageID}
 
 	_, err = conversationsCollection.DeleteOne(context.Background(), filter)
-
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": err})
+		return utils.RespondWithError(c, 400, "Failed to delete message")
 	}
 
 	return c.Status(200).JSON(fiber.Map{"msg": "Message deleted"})
@@ -177,7 +184,7 @@ func DeleteConversation(c *fiber.Ctx) error {
 
 	conversationID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid ID"})
+		return utils.RespondWithError(c, 400, "Invalid conversation ID")
 	}
 
 	messagesFilter := bson.M{"conversationID": conversationID}
@@ -185,12 +192,12 @@ func DeleteConversation(c *fiber.Ctx) error {
 
 	_, err = messagesCollection.DeleteMany(context.Background(), messagesFilter)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "DB error"})
+		return utils.RespondWithError(c, 500, "Failed to delete messages")
 	}
 
 	_, err = conversationsCollection.DeleteOne(context.Background(), conversationFilter)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "DB error"})
+		return utils.RespondWithError(c, 500, "Failed to delete conversation")
 	}
 
 	return c.Status(200).JSON(fiber.Map{"msg": "Conversation deleted successfully"})
@@ -205,25 +212,27 @@ func EditMessage(c *fiber.Ctx) error {
 	}
 
 	if err := c.BodyParser(&payload); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+		return utils.RespondWithError(c, 400, "Invalid request body")
 	}
 
 	messageID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid ID"})
+		return utils.RespondWithError(c, 400, "Invalid message ID")
 	}
 
 	filter := bson.M{"_id": messageID}
 
 	err = messagesCollection.FindOne(context.Background(), filter).Decode(&payload)
-
 	if err != nil {
-		return c.Status(404).JSON(fiber.Map{"error": "Message not found"})
+		return utils.RespondWithError(c, 404, "Message not found")
 	}
 
 	update := bson.M{"$set": bson.M{"content": payload.NewContent}}
 
 	_, err = messagesCollection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Failed to update message")
+	}
 
 	return c.Status(200).JSON(fiber.Map{"msg": "Message updated"})
 }

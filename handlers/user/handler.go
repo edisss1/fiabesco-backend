@@ -2,8 +2,10 @@ package user
 
 import (
 	"context"
+	"errors"
 	"github.com/edisss1/fiabesco-backend/db"
 	"github.com/edisss1/fiabesco-backend/types"
+	"github.com/edisss1/fiabesco-backend/utils"
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -93,5 +95,48 @@ func GetProfileData(c *fiber.Ctx) error {
 	}
 
 	return c.Status(200).JSON(user)
+
+}
+
+func BlockUser(c *fiber.Ctx) error {
+	collection = db.Database.Collection("users")
+
+	id := c.Params("_id")
+	userID, err := utils.ParseHexID(id)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid ID")
+	}
+
+	var user types.User
+
+	var blockedUser struct {
+		ID primitive.ObjectID `json:"id" bson:"id"`
+	}
+
+	if err := c.BodyParser(&blockedUser); err != nil {
+		return utils.RespondWithError(c, 400, "Invalid request body")
+	}
+
+	filter := bson.M{"_id": userID}
+	err = collection.FindOne(context.Background(), filter).Decode(&user)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return utils.RespondWithError(c, 404, "User not found")
+	}
+
+	for _, blockedID := range user.BlockedUsers {
+		if blockedID == blockedUser.ID {
+			return utils.RespondWithError(c, 400, "User is already blocked")
+		}
+	}
+
+	user.BlockedUsers = append(user.BlockedUsers, blockedUser.ID)
+
+	update := bson.M{"$set": bson.M{"blockedUsers": user.BlockedUsers}}
+	_, err = collection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Failed to update user")
+	}
+
+	return c.Status(200).JSON(fiber.Map{"msg": "User blocked"})
 
 }
