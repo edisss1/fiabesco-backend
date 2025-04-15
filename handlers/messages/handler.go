@@ -2,7 +2,7 @@ package messages
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"github.com/edisss1/fiabesco-backend/db"
 	"github.com/edisss1/fiabesco-backend/types"
 	"github.com/gofiber/fiber/v2"
@@ -16,27 +16,66 @@ var messagesCollection *mongo.Collection
 var conversationsCollection *mongo.Collection
 
 func SendMessage(c *fiber.Ctx) error {
-	id := c.Params("_id")
-	senderID, err := primitive.ObjectIDFromHex(id)
+	conversationIDParam := c.Params("conversationID")
+	senderIDParam := c.Params("senderID")
+
+	conversationID, err := primitive.ObjectIDFromHex(conversationIDParam)
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid ID"})
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid conversation ID"})
 	}
 
-	messagesCollection = db.Database.Collection("messages")
-	conversationsCollection = db.Database.Collection("conversations")
+	senderID, err := primitive.ObjectIDFromHex(senderIDParam)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid sender ID"})
+	}
 
 	var msg struct {
-		RecipientID string `json:"recipientID,omitempty" bson:"recipientID,omitempty"`
-		Content     string `json:"content"`
+		Content string `json:"content"`
 	}
 
 	if err := c.BodyParser(&msg); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
-	recipientID, err := primitive.ObjectIDFromHex(msg.RecipientID)
+	messagesCollection = db.Database.Collection("messages")
+
+	message := types.Message{
+		SenderID:       senderID,
+		ConversationID: conversationID,
+		Content:        msg.Content,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+	}
+
+	_, err = messagesCollection.InsertOne(context.Background(), message)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to send message"})
+	}
+
+	return c.Status(201).JSON(fiber.Map{"msg": "Message sent"})
+}
+
+func StartConversation(c *fiber.Ctx) error {
+
+	conversationsCollection = db.Database.Collection("conversation")
+
+	var payload struct {
+		SenderID    string `json:"senderID"`
+		RecipientID string `json:"recipientID"`
+	}
+
+	if err := c.BodyParser(&payload); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	senderID, err := primitive.ObjectIDFromHex(payload.SenderID)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid sender ID"})
+	}
+	recipientID, err := primitive.ObjectIDFromHex(payload.RecipientID)
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid recipient ID"})
+
 	}
 
 	var conversation types.Conversation
@@ -49,34 +88,26 @@ func SendMessage(c *fiber.Ctx) error {
 
 	err = conversationsCollection.FindOne(context.Background(), filter).Decode(&conversation)
 
-	if err == mongo.ErrNoDocuments {
-		conversation = types.Conversation{
-			IsGroup:      false,
-			Participants: []primitive.ObjectID{senderID, recipientID},
-			CreatedAt:    time.Now(),
-			UpdatedAt:    time.Now(),
-		}
-		result, err := conversationsCollection.InsertOne(context.Background(), conversation)
-		if err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to create conversation"})
-		}
-		conversation.ID = result.InsertedID.(primitive.ObjectID)
-		fmt.Println("Conversation ID: ", conversation.ID)
-		fmt.Println("Result: ", result)
-	} else if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to check conversation"})
+	if err == nil {
+		return c.JSON(fiber.Map{
+			"conversationID": conversation.ID.Hex(),
+		})
+	} else if !errors.Is(err, mongo.ErrNoDocuments) {
+		return c.Status(500).JSON(fiber.Map{"error": "DB error"})
 	}
 
-	message := types.Message{
-		SenderID:       senderID,
-		ConversationID: conversation.ID,
-		Content:        msg.Content,
-		CreatedAt:      time.Now(),
-		UpdatedAt:      time.Now(),
+	newConversation := types.Conversation{
+		IsGroup:      false,
+		Participants: []primitive.ObjectID{senderID, recipientID},
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 	}
 
-	_, err = messagesCollection.InsertOne(context.Background(), message)
+	result, err := conversationsCollection.InsertOne(context.Background(), newConversation)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to create conversation"})
+	}
 
-	return c.Status(201).JSON(fiber.Map{"msg": "Message sent"})
+	return c.Status(201).JSON(fiber.Map{"conversationID": result.InsertedID.(primitive.ObjectID).Hex()})
 
 }
