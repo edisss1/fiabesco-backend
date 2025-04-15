@@ -38,4 +38,7 @@ func postRoutes(app *fiber.App) {
 func messageRoutes(app *fiber.App) {
 	app.Post("/conversations/start", middleware.RequireJWT, messages.StartConversation)
 	app.Post("/conversations/:conversationID/messages/:senderID", middleware.RequireJWT, messages.SendMessage)
+	app.Delete("/messages/delete", middleware.RequireJWT, messages.DeleteMessage)
+	app.Delete("/conversations/:conversationID", middleware.RequireJWT, messages.DeleteConversation)
+	app.Patch("/messages/:_id", middleware.RequireJWT, messages.EditMessage)
 }
