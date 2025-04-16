@@ -10,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"strings"
 	"time"
 )
@@ -235,4 +236,42 @@ func EditMessage(c *fiber.Ctx) error {
 	}
 
 	return c.Status(200).JSON(fiber.Map{"msg": "Message updated"})
+}
+
+func GetConversation(c *fiber.Ctx) error {
+	conversationsCollection = db.Database.Collection("conversations")
+	messagesCollection = db.Database.Collection("messages")
+	id := c.Params("conversationID")
+	conversationID, err := utils.ParseHexID(id)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid ID")
+	}
+	var conversation types.Conversation
+
+	err = conversationsCollection.FindOne(context.Background(), bson.M{"_id": conversation}).Decode(&conversation)
+	if err != nil {
+		return utils.RespondWithError(c, 404, "Conversation not found")
+	}
+
+	filter := bson.M{"conversationID": conversationID}
+	opts := options.Find().SetSort(bson.D{{"createdAt", -1}})
+
+	cursor, err := messagesCollection.Find(context.Background(), filter, opts)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Couldn't get messages")
+	}
+	var messages []types.Message
+	if err := cursor.All(context.Background(), &messages); err != nil {
+		return utils.RespondWithError(c, 500, "Error decoding messages")
+	}
+	var lastMessage types.Message
+
+	for _, msg := range messages {
+		if msg.ID == conversation.LastMessage {
+			lastMessage = msg
+			break
+		}
+	}
+
+	return c.Status(200).JSON(fiber.Map{"conversation": conversation, "messages": messages, "lastMessage": lastMessage})
 }

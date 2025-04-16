@@ -42,4 +42,5 @@ func messageRoutes(app *fiber.App) {
 	app.Delete("/messages/delete", middleware.RequireJWT, messages.DeleteMessage)
 	app.Delete("/conversations/:conversationID", middleware.RequireJWT, messages.DeleteConversation)
 	app.Patch("/messages/:_id", middleware.RequireJWT, messages.EditMessage)
+	app.Get("/conversations/:conversationID", middleware.RequireJWT, messages.GetConversation)
 }

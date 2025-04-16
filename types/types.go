@@ -21,7 +21,7 @@ type User struct {
 	FollowedBy     []string             `json:"followedBy" bson:"followedBy"`
 	FollowedUsers  []string             `json:"followedUsers" bson:"followedUsers"`
 	CreatedAt      time.Time            `json:"createdAt" bson:"createdAt"`
-	BlockedUsers   []primitive.ObjectID `json:"blockedUsers,omitempty" bson:"blockedUsers,omitempty"`
+	BlockedUsers   []primitive.ObjectID `json:"blockedUsers,omitempty" bson:"blockedUsers,omitempty	"`
 }
 
 type Post struct {
@@ -59,7 +59,7 @@ type Conversation struct {
 	Names        []string             `json:"names"`
 	IsGroup      bool                 `json:"isGroup" bson:"isGroup"`
 	Name         string               `json:"name"`
-	LastMessage  string               `json:"lastMessage" bson:"lastMessage"`
+	LastMessage  primitive.ObjectID   `json:"lastMessage" bson:"lastMessage"`
 	CreatedAt    time.Time            `json:"createdAt" bson:"createdAt"`
 	UpdatedAt    time.Time            `json:"updatedAt" bson:"updatedAt"`
 }
