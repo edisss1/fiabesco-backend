@@ -59,7 +59,7 @@ type Conversation struct {
 	Names        []string             `json:"names"`
 	IsGroup      bool                 `json:"isGroup" bson:"isGroup"`
 	Name         string               `json:"name"`
-	LastMessage  primitive.ObjectID   `json:"lastMessage" bson:"lastMessage"`
+	LastMessage  Message              `json:"lastMessage" bson:"lastMessage"`
 	CreatedAt    time.Time            `json:"createdAt" bson:"createdAt"`
 	UpdatedAt    time.Time            `json:"updatedAt" bson:"updatedAt"`
 }

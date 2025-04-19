@@ -21,6 +21,7 @@ var usersCollection *mongo.Collection
 
 func StartConversation(c *fiber.Ctx) error {
 	conversationsCollection = db.Database.Collection("conversations")
+	usersCollection = db.Database.Collection("users")
 
 	var payload struct {
 		SenderID    string `json:"senderID"`
@@ -135,13 +136,13 @@ func SendMessage(c *fiber.Ctx) error {
 		return utils.RespondWithError(c, 404, "Conversation not found")
 	}
 
-	insertOneResult, err := messagesCollection.InsertOne(context.Background(), message)
+	_, err = messagesCollection.InsertOne(context.Background(), message)
 	if err != nil {
 		return utils.RespondWithError(c, 500, "Failed to send message")
 	}
 
 	filter := bson.M{"_id": conversationID}
-	update := bson.M{"$set": bson.M{"lastMessage": insertOneResult.InsertedID}}
+	update := bson.M{"$set": bson.M{"lastMessage": message}}
 
 	_, err = conversationsCollection.UpdateOne(context.Background(), filter, update)
 	if err != nil {
@@ -264,14 +265,31 @@ func GetConversation(c *fiber.Ctx) error {
 	if err := cursor.All(context.Background(), &messages); err != nil {
 		return utils.RespondWithError(c, 500, "Error decoding messages")
 	}
-	var lastMessage types.Message
 
-	for _, msg := range messages {
-		if msg.ID == conversation.LastMessage {
-			lastMessage = msg
-			break
-		}
+	return c.Status(200).JSON(fiber.Map{"conversation": conversation, "messages": messages})
+}
+
+func GetConversations(c *fiber.Ctx) error {
+	id := c.Params("userID")
+	userID, err := utils.ParseHexID(id)
+
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid ID")
 	}
 
-	return c.Status(200).JSON(fiber.Map{"conversation": conversation, "messages": messages, "lastMessage": lastMessage})
+	var conversations []types.Conversation
+	conversationsCollection = db.Database.Collection("conversations")
+
+	filter := bson.M{"participants": userID}
+	cursor, err := conversationsCollection.Find(context.Background(), filter)
+
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Failed to get conversations")
+	}
+
+	if err := cursor.All(context.Background(), &conversations); err != nil {
+		return utils.RespondWithError(c, 500, "Error decoding conversations")
+	}
+
+	return c.Status(200).JSON(conversations)
 }
