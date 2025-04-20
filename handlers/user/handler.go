@@ -140,3 +140,36 @@ func BlockUser(c *fiber.Ctx) error {
 	return c.Status(200).JSON(fiber.Map{"msg": "User blocked"})
 
 }
+
+func EditBio(c *fiber.Ctx) error {
+	id := c.Params("_id")
+	userID, err := utils.ParseHexID(id)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid user ID")
+	}
+
+	var body struct {
+		Bio string `json:"bio"`
+	}
+
+	if err := c.BodyParser(&body); err != nil {
+		return utils.RespondWithError(c, 400, "Invalid request body")
+	}
+
+	if body.Bio == "" {
+		return utils.RespondWithError(c, 400, "Bio cannot be empty")
+	}
+
+	collection = db.Database.Collection("users")
+
+	filter := bson.M{"_id": userID}
+	update := bson.M{"$set": bson.M{"bio": body.Bio}}
+
+	_, err = collection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return utils.RespondWithError(c, 500, err.Error())
+
+	}
+
+	return c.Status(200).JSON(fiber.Map{"newBio": body.Bio})
+}

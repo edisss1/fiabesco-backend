@@ -32,7 +32,7 @@ type Post struct {
 	UserPhotoURL  string             `json:"userPhotoURL" bson:"userPhotoURL"`
 	UserHandle    string             `json:"userHandle" bson:"userHandle"`
 	Caption       string             `json:"caption"`
-	Images        []string           `json:"images"`
+	Files         []string           `json:"images"`
 	Tags          []string           `json:"tags"`
 	LikesCount    uint32             `json:"likesCount"`
 	CommentsCount uint32             `json:"commentsCount"`

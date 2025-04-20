@@ -2,14 +2,19 @@ package post
 
 import (
 	"context"
+	"fmt"
 	"github.com/edisss1/fiabesco-backend/db"
 	"github.com/edisss1/fiabesco-backend/types"
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
+	"github.com/imroc/req/v3"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"io"
 	"log"
+	"os"
 	"strconv"
 	"time"
 )
@@ -19,7 +24,6 @@ var collection *mongo.Collection
 func CreatePost(c *fiber.Ctx) error {
 	userID := c.Params("_id")
 	objectID, err := primitive.ObjectIDFromHex(userID)
-
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid ID"})
 	}
@@ -30,8 +34,6 @@ func CreatePost(c *fiber.Ctx) error {
 	postsCollection := db.Database.Collection("posts")
 	usersCollection := db.Database.Collection("users")
 
-	err = usersCollection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&user)
-
 	if err := c.BodyParser(&post); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
@@ -40,8 +42,44 @@ func CreatePost(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Missing caption"})
 	}
 
-	post.UserID = objectID
+	err = usersCollection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&user)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "User not found"})
+	}
 
+	file, err := c.FormFile("file")
+	if err == nil && file != nil {
+		src, err := file.Open()
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to open file"})
+		}
+		defer src.Close()
+
+		fileBytes, err := io.ReadAll(src)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to read file"})
+		}
+
+		uniqueFileName := fmt.Sprintf("%s-%s", uuid.New().String(), file.Filename)
+		supabaseUploadURL := fmt.Sprintf("https://fiabesco-storage.supabase.co/storage/v1/object/posts/%s", uniqueFileName)
+
+		client := req.C().SetCommonBearerAuthToken(os.Getenv("SUPABASE_SERVICE_KEY"))
+
+		resp, err := client.R().
+			SetHeader("Content-Type", file.Header.Get("Content-Type")).
+			SetBody(fileBytes).
+			Put(supabaseUploadURL)
+
+		if err != nil || resp.StatusCode >= 400 {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to upload to Supabase"})
+		}
+
+		publicURL := fmt.Sprintf("https://<your-project>.supabase.co/storage/v1/object/public/posts/%s", uniqueFileName)
+		post.Files = append(post.Files, publicURL)
+	}
+
+	// Assign post metadata
+	post.UserID = objectID
 	post.CreatedAt = time.Now()
 	post.UpdatedAt = time.Now()
 	post.UserFirstName = user.FirstName
@@ -50,9 +88,8 @@ func CreatePost(c *fiber.Ctx) error {
 	post.UserPhotoURL = user.PhotoURL
 
 	_, err = postsCollection.InsertOne(context.Background(), post)
-
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "An error occurred"})
+		return c.Status(500).JSON(fiber.Map{"error": "An error occurred while saving post"})
 	}
 
 	return c.Status(201).JSON(post)
