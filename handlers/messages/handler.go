@@ -149,7 +149,7 @@ func SendMessage(c *fiber.Ctx) error {
 		return utils.RespondWithError(c, 500, "Failed to update conversation")
 	}
 
-	return c.Status(201).JSON(fiber.Map{"msg": "Message sent"})
+	return c.Status(201).JSON(fiber.Map{"newMessage": message})
 }
 
 func DeleteMessage(c *fiber.Ctx) error {
