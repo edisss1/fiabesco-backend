@@ -249,7 +249,7 @@ func GetConversation(c *fiber.Ctx) error {
 	}
 	var conversation types.Conversation
 
-	err = conversationsCollection.FindOne(context.Background(), bson.M{"_id": conversation}).Decode(&conversation)
+	err = conversationsCollection.FindOne(context.Background(), bson.M{"_id": conversationID}).Decode(&conversation)
 	if err != nil {
 		return utils.RespondWithError(c, 404, "Conversation not found")
 	}
