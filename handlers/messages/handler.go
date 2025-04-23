@@ -2,8 +2,10 @@ package messages
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/edisss1/fiabesco-backend/db"
+	"github.com/edisss1/fiabesco-backend/handlers/ws"
 	"github.com/edisss1/fiabesco-backend/types"
 	"github.com/edisss1/fiabesco-backend/utils"
 	"github.com/gofiber/fiber/v2"
@@ -11,6 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"log"
 	"strings"
 	"time"
 )
@@ -148,6 +151,14 @@ func SendMessage(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.RespondWithError(c, 500, "Failed to update conversation")
 	}
+
+	go func() {
+		jsonMsg, err := json.Marshal(message)
+		if err != nil {
+			log.Println("Failed to marshal message for WebSocket: ", err)
+		}
+		ws.Broadcast <- string(jsonMsg)
+	}()
 
 	return c.Status(201).JSON(fiber.Map{"newMessage": message})
 }
