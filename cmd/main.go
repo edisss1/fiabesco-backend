@@ -23,34 +23,7 @@ func main() {
 
 	})
 
-	go ws.RunHub()
-
-	app.Get("/ws", websocket.New(func(conn *websocket.Conn) {
-		defer func() {
-			ws.Unregister <- conn
-			conn.Close()
-
-		}()
-		ws.Register <- conn
-
-		for {
-			messageType, message, err := conn.ReadMessage()
-			if err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-					log.Println("read error:", err)
-				}
-
-				return // Calls the deferred function, i.e. closes the connection on error
-			}
-
-			if messageType == websocket.TextMessage {
-				// Broadcast the received message
-				ws.Broadcast <- string(message)
-			} else {
-				log.Println("websocket message received of type", messageType)
-			}
-		}
-	}))
+	app.Get("/ws", websocket.New(ws.HandleWS))
 
 	port := config.GetPort()
 
