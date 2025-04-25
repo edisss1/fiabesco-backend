@@ -173,3 +173,84 @@ func EditBio(c *fiber.Ctx) error {
 
 	return c.Status(200).JSON(fiber.Map{"newBio": body.Bio})
 }
+
+func GetFollowing(c *fiber.Ctx) error {
+	id := c.Params("_id")
+	userID, err := utils.ParseHexID(id)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid user ID")
+	}
+
+	collection := db.Database.Collection("users")
+
+	var user types.User
+	userFilter := bson.M{"_id": userID}
+
+	err = collection.FindOne(context.Background(), userFilter).Decode(&user)
+	if err != nil {
+		return utils.RespondWithError(c, 404, "User not found")
+	}
+
+	var followedUserIDs []primitive.ObjectID
+	for _, followedID := range user.FollowedUsers {
+		fid, err := utils.ParseHexID(followedID)
+		if err != nil {
+			return utils.RespondWithError(c, 400, "Invalid followed user ID")
+		}
+		followedUserIDs = append(followedUserIDs, fid)
+	}
+
+	filter := bson.M{"_id": bson.M{"$in": followedUserIDs}}
+	cursor, err := collection.Find(context.Background(), filter)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Database error: "+err.Error())
+	}
+	defer cursor.Close(context.Background())
+
+	var followedUsers []types.User
+	if err := cursor.All(context.Background(), &followedUsers); err != nil {
+		return utils.RespondWithError(c, 500, "Failed to decode followed users")
+	}
+
+	return c.Status(200).JSON(followedUsers)
+}
+
+func FollowUser(c *fiber.Ctx) error {
+	id := c.Params("_id")
+	userID, err := utils.ParseHexID(id)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid user ID")
+	}
+
+	var body struct {
+		ID string `json:"id"`
+	}
+
+	if err := c.BodyParser(&body); err != nil {
+		return utils.RespondWithError(c, 400, "Missing or invalid request body")
+	}
+
+	collection := db.Database.Collection("users")
+
+	var user types.User
+	filter := bson.M{"_id": userID}
+	err = collection.FindOne(context.Background(), filter).Decode(&user)
+	if err != nil {
+		return utils.RespondWithError(c, 404, "User not found")
+	}
+
+	for _, followedID := range user.FollowedUsers {
+		if followedID == body.ID {
+			return utils.RespondWithError(c, 400, "Already following this user")
+		}
+	}
+
+	update := bson.M{"$push": bson.M{"followedUsers": body.ID}}
+
+	_, err = collection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Failed to follow the user")
+	}
+
+	return c.Status(200).JSON(fiber.Map{"msg": "Successfully followed the user"})
+}
