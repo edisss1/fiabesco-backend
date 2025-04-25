@@ -10,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var collection *mongo.Collection
@@ -201,18 +202,30 @@ func GetFollowing(c *fiber.Ctx) error {
 	}
 
 	filter := bson.M{"_id": bson.M{"$in": followedUserIDs}}
-	cursor, err := collection.Find(context.Background(), filter)
+
+	projection := bson.M{
+		"firstName": 1,
+		"lastName":  1,
+		"handle":    1,
+		"photoURL":  1,
+		"bio":       1,
+		"_id":       1,
+	}
+
+	opts := options.Find().SetProjection(projection)
+
+	cursor, err := collection.Find(context.Background(), filter, opts)
 	if err != nil {
 		return utils.RespondWithError(c, 500, "Database error: "+err.Error())
 	}
 	defer cursor.Close(context.Background())
 
-	var followedUsers []types.User
-	if err := cursor.All(context.Background(), &followedUsers); err != nil {
+	var followed []types.User
+	if err := cursor.All(context.Background(), &followed); err != nil {
 		return utils.RespondWithError(c, 500, "Failed to decode followed users")
 	}
 
-	return c.Status(200).JSON(followedUsers)
+	return c.Status(200).JSON(followed)
 }
 
 func FollowUser(c *fiber.Ctx) error {
