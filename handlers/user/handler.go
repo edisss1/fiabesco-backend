@@ -265,5 +265,18 @@ func FollowUser(c *fiber.Ctx) error {
 		return utils.RespondWithError(c, 500, "Failed to follow the user")
 	}
 
+	incrementFollowers := bson.M{"$inc": bson.M{"followersCount": 1}}
+	incrementFollowed := bson.M{"$inc": bson.M{"followingCount": 1}}
+
+	followerID, err := utils.ParseHexID(body.ID)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid follower ID")
+	}
+
+	followerFilter := bson.M{"_id": followerID}
+
+	_, err = collection.UpdateOne(context.Background(), filter, incrementFollowers)
+	_, err = collection.UpdateOne(context.Background(), followerFilter, incrementFollowed)
+
 	return c.Status(200).JSON(fiber.Map{"msg": "Successfully followed the user"})
 }
