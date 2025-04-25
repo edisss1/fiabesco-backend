@@ -27,6 +27,8 @@ func userRoutes(app *fiber.App) {
 	app.Get("/users/profile/:_id", middleware.RequireJWT, user.GetProfileData)
 	app.Put("/users/:_id/block", middleware.RequireJWT, user.BlockUser)
 	app.Put("/users/:_id/bio", middleware.RequireJWT, user.EditBio)
+	app.Get("/users/:_id/following", middleware.RequireJWT, user.GetFollowing)
+	app.Post("users/:_id/follow", middleware.RequireJWT, user.FollowUser)
 }
 
 func postRoutes(app *fiber.App) {
