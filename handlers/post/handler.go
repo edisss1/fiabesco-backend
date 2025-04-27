@@ -156,6 +156,27 @@ func DeletePost(c *fiber.Ctx) error {
 	return c.Status(200).JSON(fiber.Map{"msg": "Post was deleted successfully"})
 }
 
+func GetPost(c *fiber.Ctx) error {
+	id := c.Params("postID")
+	postID, err := utils.ParseHexID(id)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid ID")
+	}
+	var post types.Post
+
+	collection = db.Database.Collection("posts")
+
+	filter := bson.M{"_id": postID}
+
+	err = collection.FindOne(context.Background(), filter).Decode(&post)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Failed to decode post")
+	}
+
+	return c.Status(200).JSON(post)
+
+}
+
 func GetFeedPosts(c *fiber.Ctx) error {
 	sampleSizeParam := c.Query("sample", "0") // Default to 0 (no sampling)
 	limitParam := c.Query("limit", "10")
@@ -207,7 +228,7 @@ func GetFeedPosts(c *fiber.Ctx) error {
 		for cursor.Next(context.Background()) {
 			var post types.Post
 			if err := cursor.Decode(&post); err != nil {
-				return c.Status(500).JSON(fiber.Map{"error": "Failed to decode post"})
+				return c.Status(500).JSON(fiber.Map{"error": "Failed to decode post" + err.Error()})
 			}
 			posts = append(posts, post)
 		}
