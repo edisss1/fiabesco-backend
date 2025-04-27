@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/edisss1/fiabesco-backend/db"
 	"github.com/edisss1/fiabesco-backend/types"
+	"github.com/edisss1/fiabesco-backend/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/imroc/req/v3"
@@ -16,6 +17,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -78,7 +80,6 @@ func CreatePost(c *fiber.Ctx) error {
 		post.Files = append(post.Files, publicURL)
 	}
 
-	// Assign post metadata
 	post.UserID = objectID
 	post.CreatedAt = time.Now()
 	post.UpdatedAt = time.Now()
@@ -87,10 +88,11 @@ func CreatePost(c *fiber.Ctx) error {
 	post.UserHandle = user.Handle
 	post.UserPhotoURL = user.PhotoURL
 
-	_, err = postsCollection.InsertOne(context.Background(), post)
+	res, err := postsCollection.InsertOne(context.Background(), post)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "An error occurred while saving post"})
 	}
+	post.ID = res.InsertedID.(primitive.ObjectID)
 
 	return c.Status(201).JSON(post)
 }
@@ -260,4 +262,108 @@ func UpdatePostCaption(c *fiber.Ctx) error {
 	}
 
 	return c.Status(200).JSON(fiber.Map{"msg": "Post updated successfully"})
+}
+
+func LikePost(c *fiber.Ctx) error {
+	var body struct {
+		UserID string `json:"userID"`
+		PostID string `json:"postID"`
+	}
+
+	likesCollection := db.Database.Collection("likes")
+	postsCollection := db.Database.Collection("posts")
+	usersCollection := db.Database.Collection("users")
+
+	if err := c.BodyParser(&body); err != nil {
+		return utils.RespondWithError(c, 400, "Invalid request body")
+	}
+
+	postID, err := utils.ParseHexID(body.PostID)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid post ID")
+	}
+	userID, err := utils.ParseHexID(body.UserID)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid user ID")
+	}
+
+	postFilter := bson.M{"_id": postID}
+	likeFilter := bson.M{"postID": postID, "userID": userID}
+	userFilter := bson.M{"_id": userID}
+
+	var like types.Like
+	var post types.Post
+	var update bson.M
+	var user types.User
+
+	// Check if the user exists
+	err = usersCollection.FindOne(context.Background(), userFilter).Decode(&user)
+	if err != nil {
+		return utils.RespondWithError(c, 404, "User not found")
+	}
+
+	// Get user's full name
+	userName := strings.TrimSpace(user.FirstName + " " + user.LastName)
+
+	// Fetch the post document
+	err = postsCollection.FindOne(context.Background(), postFilter).Decode(&post)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Failed to retrieve post: "+err.Error())
+	}
+
+	err = likesCollection.FindOne(context.Background(), likeFilter).Decode(&like)
+
+	if err == nil {
+		// If already liked, unlike the post
+		_, err = likesCollection.DeleteOne(context.Background(), likeFilter)
+		if err != nil {
+			return utils.RespondWithError(c, 500, "Failed to unlike the post: "+err.Error())
+		}
+
+		// Decrement the like count
+		update = bson.M{"$inc": bson.M{"likesCount": -1}}
+
+		// Apply the update to the post
+		_, err = postsCollection.UpdateOne(context.Background(), postFilter, update)
+		if err != nil {
+			return utils.RespondWithError(c, 500, "Failed to update post like count: "+err.Error())
+		}
+
+		err = postsCollection.FindOne(context.Background(), postFilter).Decode(&post)
+		if err != nil {
+			return utils.RespondWithError(c, 500, "Failed to retrieve updated post: "+err.Error())
+		}
+
+		return c.Status(200).JSON(fiber.Map{
+			"likesCount": post.LikesCount,
+		})
+	}
+
+	update = bson.M{"$inc": bson.M{"likesCount": 1}}
+
+	newLike := types.Like{
+		PostID:    postID,
+		UserID:    userID,
+		UserName:  userName,
+		CreatedAt: time.Now(),
+	}
+
+	_, err = likesCollection.InsertOne(context.Background(), newLike)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Failed to add like: "+err.Error())
+	}
+
+	_, err = postsCollection.UpdateOne(context.Background(), postFilter, update)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Failed to update post like count: "+err.Error())
+	}
+
+	err = postsCollection.FindOne(context.Background(), postFilter).Decode(&post)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Failed to retrieve updated post: "+err.Error())
+	}
+
+	return c.Status(200).JSON(fiber.Map{
+		"likesCount": post.LikesCount,
+	})
 }

@@ -37,6 +37,7 @@ func postRoutes(app *fiber.App) {
 	app.Delete("/users/:_id/posts/:postID", middleware.RequireJWT, post.DeletePost)
 	app.Get("/posts/feed", middleware.RequireJWT, post.GetFeedPosts)
 	app.Patch("/posts/:_id", middleware.RequireJWT, post.UpdatePostCaption)
+	app.Post("/posts/like", middleware.RequireJWT, post.LikePost)
 }
 
 func messageRoutes(app *fiber.App) {

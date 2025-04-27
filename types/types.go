@@ -34,12 +34,12 @@ type Post struct {
 	Caption       string             `json:"caption"`
 	Files         []string           `json:"images"`
 	Tags          []string           `json:"tags"`
-	LikesCount    uint32             `json:"likesCount"`
-	CommentsCount uint32             `json:"commentsCount"`
-	LikedBy       []string           `json:"likedBy"`
-	CommentedBy   []string           `json:"commentedBy"`
-	CreatedAt     time.Time          `json:"createdAt"`
-	UpdatedAt     time.Time          `json:"updatedAt"`
+	LikesCount    uint32             `json:"likesCount" bson:"likesCount"`
+	CommentsCount uint32             `json:"commentsCount" bson:"commentsCount"`
+	LikedBy       []string           `json:"likedBy" bson:"likedBy"`
+	CommentedBy   []string           `json:"commentedBy" bson:"commentedBy"`
+	CreatedAt     time.Time          `json:"createdAt" bson:"createdAt"`
+	UpdatedAt     time.Time          `json:"updatedAt" bson:"updatedAt"`
 }
 
 type Message struct {
@@ -62,4 +62,27 @@ type Conversation struct {
 	LastMessage  Message              `json:"lastMessage" bson:"lastMessage"`
 	CreatedAt    time.Time            `json:"createdAt" bson:"createdAt"`
 	UpdatedAt    time.Time            `json:"updatedAt" bson:"updatedAt"`
+}
+
+type Repost struct {
+	ID        primitive.ObjectID `json:"id,omitempty" bson:"id"`
+	PostID    primitive.ObjectID `json:"postID" bson:"postID"`
+	UserID    primitive.ObjectID `json:"userID" bson:"userID"`
+	CreatedAt time.Time          `json:"createdAt" bson:"createdAt"`
+}
+
+type Like struct {
+	ID        primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
+	PostID    primitive.ObjectID `json:"postID" bson:"postID"`
+	UserID    primitive.ObjectID `json:"userID" bson:"userID"`
+	UserName  string             `json:"userName" bson:"userName"`
+	CreatedAt time.Time          `json:"createdAt" bson:"createdAt"`
+}
+
+type Comment struct {
+	ID        primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
+	PostID    primitive.ObjectID `json:"postID" bson:"postID"`
+	UserID    primitive.ObjectID `json:"userID" bson:"userID"`
+	Content   string             `json:"content"`
+	CreatedAt time.Time          `json:"createdAt" bson:"createdAt"`
 }
