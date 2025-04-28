@@ -2,114 +2,66 @@ package post
 
 import (
 	"context"
-	"fmt"
 	"github.com/edisss1/fiabesco-backend/db"
 	"github.com/edisss1/fiabesco-backend/types"
 	"github.com/edisss1/fiabesco-backend/utils"
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
-	"github.com/imroc/req/v3"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"io"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 )
 
+// TODO: find a way to optimize post fetching
+
 var collection *mongo.Collection
 
 func CreatePost(c *fiber.Ctx) error {
-	userID := c.Params("_id")
-	objectID, err := primitive.ObjectIDFromHex(userID)
+	id := c.Params("_id")
+	userID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid ID"})
 	}
 
-	var post types.Post
-	var user types.User
+	collection = db.Database.Collection("posts")
 
-	postsCollection := db.Database.Collection("posts")
-	usersCollection := db.Database.Collection("users")
-
-	if err := c.BodyParser(&post); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
+	var body struct {
+		Caption string `json:"caption"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return utils.RespondWithError(c, 400, "Invalid request body")
 	}
 
-	if post.Caption == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "Missing caption"})
+	newPost := types.Post{
+		UserID:    userID,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Caption:   body.Caption,
 	}
 
-	err = usersCollection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&user)
-	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "User not found"})
-	}
+	res, err := collection.InsertOne(context.Background(), newPost)
+	newPost.ID = res.InsertedID.(primitive.ObjectID)
 
-	file, err := c.FormFile("file")
-	if err == nil && file != nil {
-		src, err := file.Open()
-		if err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to open file"})
-		}
-		defer src.Close()
-
-		fileBytes, err := io.ReadAll(src)
-		if err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to read file"})
-		}
-
-		uniqueFileName := fmt.Sprintf("%s-%s", uuid.New().String(), file.Filename)
-		supabaseUploadURL := fmt.Sprintf("https://fiabesco-storage.supabase.co/storage/v1/object/posts/%s", uniqueFileName)
-
-		client := req.C().SetCommonBearerAuthToken(os.Getenv("SUPABASE_SERVICE_KEY"))
-
-		resp, err := client.R().
-			SetHeader("Content-Type", file.Header.Get("Content-Type")).
-			SetBody(fileBytes).
-			Put(supabaseUploadURL)
-
-		if err != nil || resp.StatusCode >= 400 {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to upload to Supabase"})
-		}
-
-		publicURL := fmt.Sprintf("https://<your-project>.supabase.co/storage/v1/object/public/posts/%s", uniqueFileName)
-		post.Files = append(post.Files, publicURL)
-	}
-
-	post.UserID = objectID
-	post.CreatedAt = time.Now()
-	post.UpdatedAt = time.Now()
-	post.UserFirstName = user.FirstName
-	post.UserLastName = user.LastName
-	post.UserHandle = user.Handle
-	post.UserPhotoURL = user.PhotoURL
-
-	res, err := postsCollection.InsertOne(context.Background(), post)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "An error occurred while saving post"})
-	}
-	post.ID = res.InsertedID.(primitive.ObjectID)
-
-	return c.Status(201).JSON(post)
+	return c.Status(201).JSON(newPost)
 }
 
 func GetPostsByUser(c *fiber.Ctx) error {
-	userID := c.Params("_id")
-	objectID, err := primitive.ObjectIDFromHex(userID)
+	id := c.Params("_id")
+	userID, err := primitive.ObjectIDFromHex(id)
 
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid ID"})
+		return utils.RespondWithError(c, 400, "Invalid ID")
 	}
 
 	var posts []types.Post
 
 	collection = db.Database.Collection("posts")
 
-	filter := bson.M{"userID": objectID}
+	filter := bson.M{"userID": userID}
 
 	cursor, err := collection.Find(context.Background(), filter)
 
@@ -119,7 +71,8 @@ func GetPostsByUser(c *fiber.Ctx) error {
 
 	defer func() {
 		if err := cursor.Close(context.Background()); err != nil {
-			log.Fatal(err)
+
+			log.Println(err)
 		}
 	}()
 
@@ -129,10 +82,24 @@ func GetPostsByUser(c *fiber.Ctx) error {
 		if err := cursor.Decode(&post); err != nil {
 			return err
 		}
+
 		posts = append(posts, post)
 	}
 
-	return c.Status(200).JSON(posts)
+	collection = db.Database.Collection("users")
+
+	var user types.User
+
+	userFilter := bson.M{"_id": userID}
+
+	err = collection.FindOne(context.Background(), userFilter).Decode(&user)
+	if err != nil {
+		return utils.RespondWithError(c, 404, "User not found")
+	}
+	user.Password = ""
+	user.Email = ""
+
+	return c.Status(200).JSON(fiber.Map{"posts": posts, "user": user})
 }
 
 func DeletePost(c *fiber.Ctx) error {
@@ -162,23 +129,33 @@ func GetPost(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.RespondWithError(c, 400, "Invalid ID")
 	}
-	var post types.Post
+
+	var res struct {
+		post types.Post
+		user types.User
+	}
 
 	collection = db.Database.Collection("posts")
 
-	filter := bson.M{"_id": postID}
+	postFilter := bson.M{"_id": postID}
 
-	err = collection.FindOne(context.Background(), filter).Decode(&post)
+	err = collection.FindOne(context.Background(), postFilter).Decode(&res.post)
 	if err != nil {
 		return utils.RespondWithError(c, 500, "Failed to decode post")
 	}
 
-	return c.Status(200).JSON(post)
+	userFilter := bson.M{"_id": res.post.UserID}
+	collection = db.Database.Collection("users")
 
+	err = collection.FindOne(context.Background(), userFilter).Decode(&res.user)
+	res.user.Password = ""
+	res.user.Email = ""
+
+	return c.Status(200).JSON(fiber.Map{"post": res.post, "user": res.user})
 }
 
 func GetFeedPosts(c *fiber.Ctx) error {
-	sampleSizeParam := c.Query("sample", "0") // Default to 0 (no sampling)
+	sampleSizeParam := c.Query("sample", "0")
 	limitParam := c.Query("limit", "10")
 	skipParam := c.Query("skip", "0")
 
@@ -186,11 +163,15 @@ func GetFeedPosts(c *fiber.Ctx) error {
 	limit, _ := strconv.Atoi(limitParam)
 	skip, _ := strconv.Atoi(skipParam)
 
-	collection := db.Database.Collection("posts")
-	var posts []types.Post
+	postsCollection := db.Database.Collection("posts")
+	usersCollection := db.Database.Collection("users")
+
+	var feedItems []struct {
+		Post types.Post `json:"post"`
+		User types.User `json:"user"`
+	}
 
 	if sampleSize > 0 {
-
 		effectiveSampleSize := sampleSize + skip + limit
 
 		pipeline := []bson.M{
@@ -200,18 +181,29 @@ func GetFeedPosts(c *fiber.Ctx) error {
 			{"$limit": limit},
 		}
 
-		cursor, err := collection.Aggregate(context.Background(), pipeline)
+		cursor, err := postsCollection.Aggregate(context.Background(), pipeline)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch posts"})
 		}
 		defer cursor.Close(context.Background())
 
 		for cursor.Next(context.Background()) {
-			var post types.Post
-			if err := cursor.Decode(&post); err != nil {
-				return c.Status(500).JSON(fiber.Map{"error": "Failed to decode post"})
+			var feedItem struct {
+				Post types.Post `json:"post"`
+				User types.User `json:"user"`
 			}
-			posts = append(posts, post)
+			if err := cursor.Decode(&feedItem.Post); err != nil {
+				return utils.RespondWithError(c, 500, "Failed to decode post: "+err.Error())
+			}
+
+			filter := bson.M{"_id": feedItem.Post.UserID}
+			if err := usersCollection.FindOne(context.Background(), filter).Decode(&feedItem.User); err != nil {
+				return utils.RespondWithError(c, 500, "Failed to fetch user: "+err.Error())
+			}
+			feedItem.User.Password = ""
+			feedItem.User.Email = ""
+
+			feedItems = append(feedItems, feedItem)
 		}
 	} else {
 		opts := options.Find().
@@ -219,37 +211,48 @@ func GetFeedPosts(c *fiber.Ctx) error {
 			SetSkip(int64(skip)).
 			SetSort(bson.D{{Key: "createdAt", Value: -1}})
 
-		cursor, err := collection.Find(context.Background(), bson.M{}, opts)
+		cursor, err := postsCollection.Find(context.Background(), bson.M{}, opts)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch posts"})
 		}
 		defer cursor.Close(context.Background())
 
 		for cursor.Next(context.Background()) {
-			var post types.Post
-			if err := cursor.Decode(&post); err != nil {
-				return c.Status(500).JSON(fiber.Map{"error": "Failed to decode post" + err.Error()})
+			var feedItem struct {
+				Post types.Post `json:"post"`
+				User types.User `json:"user"`
 			}
-			posts = append(posts, post)
+			if err := cursor.Decode(&feedItem.Post); err != nil {
+				return utils.RespondWithError(c, 500, "Failed to decode post: "+err.Error())
+			}
+
+			filter := bson.M{"_id": feedItem.Post.UserID}
+			if err := usersCollection.FindOne(context.Background(), filter).Decode(&feedItem.User); err != nil {
+				return utils.RespondWithError(c, 500, "Failed to fetch user: "+err.Error())
+			}
+			feedItem.User.Password = ""
+			feedItem.User.Email = ""
+
+			feedItems = append(feedItems, feedItem)
 		}
 	}
 
-	totalCount, err := collection.CountDocuments(context.Background(), bson.M{})
+	totalCount, err := postsCollection.CountDocuments(context.Background(), bson.M{})
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to count posts"})
 	}
 
 	hasMore := false
 	if sampleSize > 0 {
-		hasMore = len(posts) >= limit
+		hasMore = len(feedItems) >= limit
 	} else {
 		hasMore = (skip + limit) < int(totalCount)
 	}
 
 	return c.Status(200).JSON(fiber.Map{
-		"posts":    posts,
-		"hasMore":  hasMore,
-		"nextSkip": skip + limit,
+		"feedItems": feedItems,
+		"hasMore":   hasMore,
+		"nextSkip":  skip + limit,
 	})
 }
 
@@ -317,16 +320,13 @@ func LikePost(c *fiber.Ctx) error {
 	var update bson.M
 	var user types.User
 
-	// Check if the user exists
 	err = usersCollection.FindOne(context.Background(), userFilter).Decode(&user)
 	if err != nil {
 		return utils.RespondWithError(c, 404, "User not found")
 	}
 
-	// Get user's full name
 	userName := strings.TrimSpace(user.FirstName + " " + user.LastName)
 
-	// Fetch the post document
 	err = postsCollection.FindOne(context.Background(), postFilter).Decode(&post)
 	if err != nil {
 		return utils.RespondWithError(c, 500, "Failed to retrieve post: "+err.Error())
@@ -335,16 +335,13 @@ func LikePost(c *fiber.Ctx) error {
 	err = likesCollection.FindOne(context.Background(), likeFilter).Decode(&like)
 
 	if err == nil {
-		// If already liked, unlike the post
 		_, err = likesCollection.DeleteOne(context.Background(), likeFilter)
 		if err != nil {
 			return utils.RespondWithError(c, 500, "Failed to unlike the post: "+err.Error())
 		}
 
-		// Decrement the like count
 		update = bson.M{"$inc": bson.M{"likesCount": -1}}
 
-		// Apply the update to the post
 		_, err = postsCollection.UpdateOne(context.Background(), postFilter, update)
 		if err != nil {
 			return utils.RespondWithError(c, 500, "Failed to update post like count: "+err.Error())
@@ -387,4 +384,48 @@ func LikePost(c *fiber.Ctx) error {
 	return c.Status(200).JSON(fiber.Map{
 		"likesCount": post.LikesCount,
 	})
+}
+
+func CommentPost(c *fiber.Ctx) error {
+	id := c.Params("postID")
+	postID, err := utils.ParseHexID(id)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid ID")
+	}
+
+	var body struct {
+		UserID  string `json:"userID"`
+		Content string `json:"content"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return utils.RespondWithError(c, 400, "Invalid request body")
+	}
+
+	if body.Content == "" {
+		return utils.RespondWithError(c, 400, "Content cannot be an empty string")
+	}
+
+	userID, err := utils.ParseHexID(body.UserID)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid user ID")
+	}
+
+	collection = db.Database.Collection("comments")
+
+	newComment := types.Comment{
+		Content:   body.Content,
+		PostID:    postID,
+		UserID:    userID,
+		CreatedAt: time.Now(),
+	}
+
+	res, err := collection.InsertOne(context.Background(), newComment)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Error inserting comment")
+	}
+
+	newComment.ID = res.InsertedID.(primitive.ObjectID)
+
+	return c.Status(201).JSON(newComment)
+
 }

@@ -39,6 +39,7 @@ func postRoutes(app *fiber.App) {
 	app.Patch("/posts/:_id/caption", middleware.RequireJWT, post.UpdatePostCaption)
 	app.Post("/posts/like", middleware.RequireJWT, post.LikePost)
 	app.Get("/posts/:postID", middleware.RequireJWT, post.GetPost)
+	app.Post("/posts/:postID/comment", middleware.RequireJWT, post.CommentPost)
 }
 
 func messageRoutes(app *fiber.App) {
