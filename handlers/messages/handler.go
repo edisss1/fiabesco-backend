@@ -12,6 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"slices"
 	"strings"
 	"time"
 )
@@ -43,12 +44,14 @@ func StartConversation(c *fiber.Ctx) error {
 	}
 
 	var sender struct {
-		FirstName string `json:"firstName"`
-		LastName  string `json:"lastName"`
+		FirstName    string               `json:"firstName"`
+		LastName     string               `json:"lastName"`
+		BlockedUsers []primitive.ObjectID `json:"blockedUsers" bson:"blockedUsers"`
 	}
 	var recipient struct {
-		FirstName string `json:"firstName"`
-		LastName  string `json:"lastName"`
+		FirstName    string               `json:"firstName"`
+		LastName     string               `json:"lastName"`
+		BlockedUsers []primitive.ObjectID `json:"blockedUsers"bson:"blockedUsers"`
 	}
 
 	senderFilter := bson.M{"_id": senderID}
@@ -61,6 +64,14 @@ func StartConversation(c *fiber.Ctx) error {
 	err = usersCollection.FindOne(context.Background(), recipientFilter).Decode(&recipient)
 	if err != nil {
 		return utils.RespondWithError(c, 400, "Invalid recipient ID")
+	}
+
+	if slices.Contains(sender.BlockedUsers, recipientID) {
+		return c.Status(400).JSON(fiber.Map{"started": false, "msg": "You cannot send messages to blocked users"})
+	}
+
+	if slices.Contains(recipient.BlockedUsers, senderID) {
+		return c.Status(400).JSON(fiber.Map{"started": false, "msg": "Cannot send messages to users who blocked you"})
 	}
 
 	var conversation types.Conversation
@@ -96,7 +107,7 @@ func StartConversation(c *fiber.Ctx) error {
 		return utils.RespondWithError(c, 500, "DB error")
 	}
 
-	return c.Status(201).JSON(fiber.Map{"conversationID": result.InsertedID.(primitive.ObjectID).Hex()})
+	return c.Status(201).JSON(fiber.Map{"conversationID": result.InsertedID.(primitive.ObjectID).Hex(), "started": true})
 }
 
 func SendMessage(c *fiber.Ctx) error {

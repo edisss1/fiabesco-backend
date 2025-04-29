@@ -142,6 +142,42 @@ func BlockUser(c *fiber.Ctx) error {
 
 }
 
+func UnblockUser(c *fiber.Ctx) error {
+	collection = db.Database.Collection("users")
+
+	var body struct {
+		UserID        string `json:"userID"`
+		BlockedUserID string `json:"blockedUserID"`
+	}
+
+	if err := c.BodyParser(&body); err != nil {
+		return utils.RespondWithError(c, 400, "Invalid request body")
+	}
+
+	userID, err := utils.ParseHexID(body.UserID)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid user ID")
+	}
+	blockedUserID, err := utils.ParseHexID(body.BlockedUserID)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid blocked user ID")
+	}
+	filter := bson.M{"_id": userID}
+	update := bson.D{
+		{"$pull", bson.D{
+			{"blockedUsers", blockedUserID},
+		}},
+	}
+
+	_, err = collection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Error unblocking user")
+	}
+
+	return c.Status(200).JSON(fiber.Map{"msg": "User unblocked"})
+
+}
+
 func EditBio(c *fiber.Ctx) error {
 	id := c.Params("_id")
 	userID, err := utils.ParseHexID(id)

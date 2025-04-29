@@ -22,32 +22,41 @@ func authRoutes(app *fiber.App) {
 }
 
 func userRoutes(app *fiber.App) {
-	app.Post("/users/me", middleware.RequireJWT, user.GetUserData)
-	app.Patch("/users/:_id/photo", middleware.RequireJWT, user.UpdatePhotoURL)
-	app.Get("/users/profile/:_id", middleware.RequireJWT, user.GetProfileData)
-	app.Put("/users/:_id/block", middleware.RequireJWT, user.BlockUser)
-	app.Put("/users/:_id/bio", middleware.RequireJWT, user.EditBio)
-	app.Get("/users/:_id/following", middleware.RequireJWT, user.GetFollowing)
-	app.Post("users/:_id/follow", middleware.RequireJWT, user.FollowUser)
+	users := app.Group("/users", middleware.RequireJWT)
+	users.Post("/me", user.GetUserData)
+	users.Patch("/:_id/photo", user.UpdatePhotoURL)
+	users.Get("/profile/:_id", user.GetProfileData)
+	users.Put("/:_id/block", user.BlockUser)
+	users.Put("/unblock", user.UnblockUser)
+	users.Put("/:_id/bio", user.EditBio)
+	users.Get("/:_id/following", user.GetFollowing)
+	users.Post("/:_id/follow", user.FollowUser)
+
 }
 
 func postRoutes(app *fiber.App) {
-	app.Post("/users/:_id/posts", middleware.RequireJWT, post.CreatePost)
-	app.Get("/users/:_id/post", middleware.RequireJWT, post.GetPostsByUser)
-	app.Delete("/users/:_id/posts/:postID", middleware.RequireJWT, post.DeletePost)
-	app.Get("/posts/feed", middleware.RequireJWT, post.GetFeedPosts)
-	app.Patch("/posts/:_id/caption", middleware.RequireJWT, post.UpdatePostCaption)
-	app.Post("/posts/like", middleware.RequireJWT, post.LikePost)
-	app.Get("/posts/:postID", middleware.RequireJWT, post.GetPost)
-	app.Post("/posts/:postID/comment", middleware.RequireJWT, post.CommentPost)
+	users := app.Group("/users", middleware.RequireJWT)
+	posts := app.Group("/posts", middleware.RequireJWT)
+
+	users.Post("/:_id/posts", post.CreatePost)
+	users.Get("/:_id/post", post.GetPostsByUser)
+	users.Delete("/:_id/posts/:postID", post.DeletePost)
+	posts.Get("/feed", post.GetFeedPosts)
+	posts.Patch("/:_id/caption", post.UpdatePostCaption)
+	posts.Post("/like", post.LikePost)
+	posts.Get("/:postID", post.GetPost)
+	posts.Post("/:postID/comment", post.CommentPost)
 }
 
 func messageRoutes(app *fiber.App) {
-	app.Post("/conversations/start", middleware.RequireJWT, messages.StartConversation)
-	app.Post("/conversations/:conversationID/messages/:senderID", middleware.RequireJWT, messages.SendMessage)
-	app.Delete("/messages/delete", middleware.RequireJWT, messages.DeleteMessage)
-	app.Delete("/conversations/:conversationID", middleware.RequireJWT, messages.DeleteConversation)
-	app.Patch("/messages/:_id", middleware.RequireJWT, messages.EditMessage)
-	app.Get("/conversations/conversation/:conversationID", middleware.RequireJWT, messages.GetConversation)
-	app.Get("/conversations/:userID", middleware.RequireJWT, messages.GetConversations)
+	conversations := app.Group("/conversations", middleware.RequireJWT)
+	message := app.Group("/messages", middleware.RequireJWT)
+
+	conversations.Post("/start", messages.StartConversation)
+	conversations.Post("/:conversationID/messages/:senderID", messages.SendMessage)
+	conversations.Delete("/:conversationID", messages.DeleteConversation)
+	conversations.Get("/conversation/:conversationID", messages.GetConversation)
+	conversations.Get("/:userID", messages.GetConversations)
+	message.Patch("/messages/:_id", messages.EditMessage)
+	message.Delete("/messages/delete", messages.DeleteMessage)
 }
