@@ -10,13 +10,12 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"log"
 	"strconv"
 	"strings"
 	"time"
 )
 
-// TODO: find a way to optimize post fetching
+// TODO: update other functions to behave like GetPostsByUser
 
 var collection *mongo.Collection
 
@@ -53,53 +52,56 @@ func GetPostsByUser(c *fiber.Ctx) error {
 	id := c.Params("_id")
 	userID, err := primitive.ObjectIDFromHex(id)
 
-	if err != nil {
-		return utils.RespondWithError(c, 400, "Invalid ID")
+	pipeline := mongo.Pipeline{
+		{{"$match", bson.D{{"userID", userID}}}},
+		{{"$lookup", bson.D{
+			{"from", "users"},
+			{"localField", "userID"},
+			{"foreignField", "_id"},
+			{"as", "user"},
+		}}},
+		{{"$unwind", "$user"}},
+		{{"$project", bson.D{
+			{"post", "$$ROOT"},
+			{"user", 1},
+		}}},
+		{{"$project", bson.D{
+			{"user.password", 0},
+			{"user.email", 0},
+		}}},
 	}
-
-	var posts []types.Post
 
 	collection = db.Database.Collection("posts")
-
-	filter := bson.M{"userID": userID}
-
-	cursor, err := collection.Find(context.Background(), filter)
-
-	if err != nil {
-		return err
+	var posts []struct {
+		Post types.Post `json:"post" bson:"post"`
+		User types.User `json:"user" bson:"user"`
 	}
 
-	defer func() {
-		if err := cursor.Close(context.Background()); err != nil {
-
-			log.Println(err)
-		}
-	}()
+	cursor, err := collection.Aggregate(context.Background(), pipeline)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to get post" + err.Error()})
+	}
+	defer cursor.Close(context.Background())
 
 	for cursor.Next(context.Background()) {
-		var post types.Post
-
-		if err := cursor.Decode(&post); err != nil {
-			return err
+		var res struct {
+			Post types.Post `json:"post" bson:"post"`
+			User types.User `json:"user" bson:"user"`
 		}
 
-		posts = append(posts, post)
+		if err = cursor.Decode(&res); err != nil {
+			return utils.RespondWithError(c, 500, "Failed to decode post data"+err.Error())
+		}
+
+		posts = append(posts, res)
+
 	}
 
-	collection = db.Database.Collection("users")
-
-	var user types.User
-
-	userFilter := bson.M{"_id": userID}
-
-	err = collection.FindOne(context.Background(), userFilter).Decode(&user)
-	if err != nil {
-		return utils.RespondWithError(c, 404, "User not found")
+	if err := cursor.Err(); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Cursor iteration error: " + err.Error()})
 	}
-	user.Password = ""
-	user.Email = ""
 
-	return c.Status(200).JSON(fiber.Map{"posts": posts, "user": user})
+	return c.Status(200).JSON(fiber.Map{"posts": posts})
 }
 
 func DeletePost(c *fiber.Ctx) error {
@@ -427,5 +429,37 @@ func CommentPost(c *fiber.Ctx) error {
 	newComment.ID = res.InsertedID.(primitive.ObjectID)
 
 	return c.Status(201).JSON(newComment)
+
+}
+
+func GetComments(c *fiber.Ctx) error {
+	id := c.Params("postID")
+	postID, err := utils.ParseHexID(id)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid ID")
+	}
+
+	collection = db.Database.Collection("comments")
+	filter := bson.M{"postID": postID}
+
+	var comments []types.Comment
+
+	cursor, err := collection.Find(context.Background(), filter)
+
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Something went wrong"+err.Error())
+	}
+
+	for cursor.Next(context.Background()) {
+		var comment types.Comment
+
+		if err := cursor.Decode(&comment); err != nil {
+			return err
+		}
+
+		comments = append(comments, comment)
+	}
+
+	return c.Status(200).JSON(comments)
 
 }

@@ -46,6 +46,7 @@ func postRoutes(app *fiber.App) {
 	posts.Post("/like", post.LikePost)
 	posts.Get("/:postID", post.GetPost)
 	posts.Post("/:postID/comment", post.CommentPost)
+	posts.Get("/:postID/comments", post.GetComments)
 }
 
 func messageRoutes(app *fiber.App) {
