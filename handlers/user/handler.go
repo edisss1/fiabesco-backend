@@ -292,6 +292,7 @@ func FollowUser(c *fiber.Ctx) error {
 		if followedID == body.ID {
 			return utils.RespondWithError(c, 400, "Already following this user")
 		}
+
 	}
 
 	update := bson.M{"$push": bson.M{"followedUsers": body.ID}}

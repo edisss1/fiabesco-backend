@@ -439,27 +439,42 @@ func GetComments(c *fiber.Ctx) error {
 		return utils.RespondWithError(c, 400, "Invalid ID")
 	}
 
-	collection = db.Database.Collection("comments")
-	filter := bson.M{"postID": postID}
-
-	var comments []types.Comment
-
-	cursor, err := collection.Find(context.Background(), filter)
-
-	if err != nil {
-		return utils.RespondWithError(c, 500, "Something went wrong"+err.Error())
+	type CommentWithUser struct {
+		Comment types.Comment `json:"comment"`
+		User    types.User    `json:"user"`
 	}
+
+	commentCollection := db.Database.Collection("comments")
+	userCollection := db.Database.Collection("users")
+
+	cursor, err := commentCollection.Find(context.Background(), bson.M{"postID": postID})
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Failed to fetch comments: "+err.Error())
+	}
+	defer cursor.Close(context.Background())
+
+	var results []CommentWithUser
 
 	for cursor.Next(context.Background()) {
 		var comment types.Comment
-
 		if err := cursor.Decode(&comment); err != nil {
-			return err
+			return utils.RespondWithError(c, 500, "Failed to decode comment: "+err.Error())
 		}
 
-		comments = append(comments, comment)
+		var user types.User
+		err := userCollection.FindOne(context.Background(), bson.M{"_id": comment.UserID}).Decode(&user)
+		if err != nil {
+			return utils.RespondWithError(c, 500, "Error decoding user"+err.Error())
+		}
+
+		user.Email = ""
+		user.Password = ""
+
+		results = append(results, CommentWithUser{
+			Comment: comment,
+			User:    user,
+		})
 	}
 
-	return c.Status(200).JSON(comments)
-
+	return c.Status(200).JSON(results)
 }

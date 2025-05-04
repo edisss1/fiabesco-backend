@@ -23,6 +23,7 @@ func authRoutes(app *fiber.App) {
 
 func userRoutes(app *fiber.App) {
 	users := app.Group("/users", middleware.RequireJWT)
+
 	users.Post("/me", user.GetUserData)
 	users.Patch("/:_id/photo", user.UpdatePhotoURL)
 	users.Get("/profile/:_id", user.GetProfileData)
