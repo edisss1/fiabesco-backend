@@ -48,6 +48,7 @@ func postRoutes(app *fiber.App) {
 	posts.Get("/:postID", post.GetPost)
 	posts.Post("/:postID/comment", post.CommentPost)
 	posts.Get("/:postID/comments", post.GetComments)
+	posts.Patch("/:commentID/edit", post.EditComment)
 }
 
 func messageRoutes(app *fiber.App) {
@@ -59,6 +60,7 @@ func messageRoutes(app *fiber.App) {
 	conversations.Delete("/:conversationID", messages.DeleteConversation)
 	conversations.Get("/conversation/:conversationID", messages.GetConversation)
 	conversations.Get("/:userID", messages.GetConversations)
-	message.Patch("/messages/:_id", messages.EditMessage)
-	message.Delete("/messages/delete", messages.DeleteMessage)
+	message.Patch("/:_id", messages.EditMessage)
+	message.Delete("/delete", messages.DeleteMessage)
+
 }
