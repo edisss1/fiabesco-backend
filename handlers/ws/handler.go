@@ -3,6 +3,7 @@ package ws
 import (
 	"encoding/json"
 	"github.com/edisss1/fiabesco-backend/helpers"
+	"github.com/edisss1/fiabesco-backend/utils"
 	"github.com/gofiber/websocket/v2"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"log"
@@ -22,6 +23,13 @@ type SendMessagePayload struct {
 	RecipientID    string `json:"recipientID"`
 	ConversationID string `json:"conversationID"`
 	Content        string `json:"content"`
+}
+
+type EditMessagePayload struct {
+	MessageID      string `json:"messageID"`
+	Content        string `json:"content"`
+	ConversationID string `json:"conversationID"`
+	SenderID       string `json:"senderID"`
 }
 
 func HandleWS(conn *websocket.Conn) {
@@ -98,6 +106,54 @@ func HandleWS(conn *websocket.Conn) {
 				}
 			} else {
 				log.Printf("Sender not connected: %s\n", payload.SenderID)
+			}
+		case "edit_message":
+			var payload EditMessagePayload
+
+			if err := json.Unmarshal(base.Data, &payload); err != nil {
+				log.Println("Unmarshal error: ", err)
+				continue
+			}
+
+			messageID, err := utils.ParseHexID(payload.MessageID)
+			if err != nil {
+				log.Println("Invalid messageID: ", err)
+			}
+
+			conversationID, err := utils.ParseHexID(payload.ConversationID)
+			if err != nil {
+				log.Println("Invalid conversationID: ", err)
+			}
+			senderID, err := utils.ParseHexID(payload.SenderID)
+			if err != nil {
+				log.Println("Invalid senderID: ", err)
+			}
+
+			message, err := helpers.SaveEditedMessage(messageID, payload.Content, conversationID, senderID)
+			log.Println("Saved message: ", message)
+
+			log.Printf("Edited message: ID: %s, ConversationID: %s, SenderID: %s, Content: %s, CreatedAt: %v, UpdatedAt: %v\n",
+				message.ID, message.ConversationID, message.SenderID, message.Content, message.CreatedAt, message.UpdatedAt)
+			if err != nil {
+				log.Println("Error saving message: ", err)
+				continue
+			}
+
+			log.Println("ConversationID: ", message.ConversationID)
+			conversation, err := helpers.GetConversation(message.ConversationID)
+			if err != nil {
+				log.Println("Error getting conversation: ", err)
+			}
+
+			for _, userID := range conversation.Participants {
+
+				if conn, ok := clients[userID.Hex()]; ok {
+					err = conn.WriteJSON(message)
+					log.Printf("Sent message to user: %v\n", message)
+					if err != nil {
+						log.Println("Error sending message to user: ", err)
+					}
+				}
 			}
 
 		default:
