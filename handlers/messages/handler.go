@@ -265,18 +265,9 @@ func GetConversations(c *fiber.Ctx) error {
 		return utils.RespondWithError(c, 400, "Invalid ID")
 	}
 
-	var conversations []types.Conversation
-	conversationsCollection = db.Database.Collection("conversations")
-
-	filter := bson.M{"participants": userID}
-	cursor, err := conversationsCollection.Find(context.Background(), filter)
-
+	conversations, err := helpers.GetConversations(userID)
 	if err != nil {
-		return utils.RespondWithError(c, 500, "Failed to get conversations")
-	}
-
-	if err := cursor.All(context.Background(), &conversations); err != nil {
-		return utils.RespondWithError(c, 500, "Error decoding conversations")
+		return utils.RespondWithError(c, 500, "Couldn't get conversations")
 	}
 
 	return c.Status(200).JSON(conversations)

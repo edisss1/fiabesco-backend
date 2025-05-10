@@ -3,6 +3,7 @@ package ws
 import (
 	"encoding/json"
 	"github.com/edisss1/fiabesco-backend/helpers"
+	"github.com/edisss1/fiabesco-backend/types"
 	"github.com/edisss1/fiabesco-backend/utils"
 	"github.com/gofiber/websocket/v2"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -30,6 +31,10 @@ type EditMessagePayload struct {
 	Content        string `json:"content"`
 	ConversationID string `json:"conversationID"`
 	SenderID       string `json:"senderID"`
+}
+
+type GetConversationsPayload struct {
+	UserID string `json:"userID"`
 }
 
 func HandleWS(conn *websocket.Conn) {
@@ -86,27 +91,25 @@ func HandleWS(conn *websocket.Conn) {
 			}
 			log.Printf("Saved message: %+v\n", message)
 
-			recipientConn, ok := clients[payload.RecipientID]
-			if ok {
-				err = recipientConn.WriteJSON(message)
-				log.Printf("Sent message to recipient: %v\n", message)
-				if err != nil {
-					log.Println("Error sending message to recipient: ", err)
-				}
-			} else {
-				log.Printf("Recipient not connected: %s\n", payload.RecipientID)
+			conversation, err := helpers.GetConversation(conversationID)
+			if err != nil {
+				log.Println("Error getting conversation: ", err)
 			}
 
-			senderConn, ok := clients[payload.SenderID]
-			if ok {
-				err = senderConn.WriteJSON(message)
-				log.Printf("Sent message to sender: %v\n", message)
-				if err != nil {
-					log.Println("Error sending message to sender: ", err)
+			for _, userID := range conversation.Participants {
+				conn, ok := clients[userID.Hex()]
+				if ok {
+					err = conn.WriteJSON(struct {
+						Type    string        `json:"type"`
+						Message types.Message `json:"message"`
+					}{
+						Type:    "conversations_update",
+						Message: message,
+					})
+					log.Printf("Sent message to participant: %v\n", message)
 				}
-			} else {
-				log.Printf("Sender not connected: %s\n", payload.SenderID)
 			}
+
 		case "edit_message":
 			var payload EditMessagePayload
 
@@ -155,9 +158,43 @@ func HandleWS(conn *websocket.Conn) {
 					}
 				}
 			}
+		case "get_conversations":
+			var payload GetConversationsPayload
+			if err := json.Unmarshal(base.Data, &payload); err != nil {
+				log.Println("Unmarshal error: ", err)
+				continue
+			}
+
+			userID, err := utils.ParseHexID(payload.UserID)
+			if err != nil {
+				log.Println("Invalid userID: ", err)
+				continue
+			}
+
+			conversations, err := helpers.GetConversations(userID)
+			if err != nil {
+				log.Println("Error getting conversations: ", err)
+				continue
+			}
+
+			conn, ok := clients[payload.UserID]
+			if ok {
+				err = conn.WriteJSON(struct {
+					Type          string               `json:"type"`
+					Conversations []types.Conversation `json:"conversations"`
+				}{
+					Type:          "conversations",
+					Conversations: conversations,
+				})
+				log.Printf("Sent conversations to user: %v\n", conversations)
+				if err != nil {
+					log.Println("Error sending conversations to user: ", err)
+				}
+			}
 
 		default:
 			log.Printf("Unknown message type: %s\n", base.Type)
+
 		}
 	}
 }
