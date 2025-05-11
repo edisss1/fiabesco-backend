@@ -12,6 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"log"
 	"slices"
 	"strings"
 	"time"
@@ -141,7 +142,7 @@ func SendMessage(c *fiber.Ctx) error {
 }
 
 func DeleteMessage(c *fiber.Ctx) error {
-	conversationsCollection = db.Database.Collection("conversations")
+	messagesCollection = db.Database.Collection("messages")
 
 	var payload struct {
 		ID string `json:"id"`
@@ -150,6 +151,7 @@ func DeleteMessage(c *fiber.Ctx) error {
 	if err := c.BodyParser(&payload); err != nil {
 		return utils.RespondWithError(c, 400, "Invalid request body")
 	}
+	log.Printf("Payload ID: %s", payload.ID)
 
 	messageID, err := primitive.ObjectIDFromHex(payload.ID)
 	if err != nil {
@@ -158,7 +160,7 @@ func DeleteMessage(c *fiber.Ctx) error {
 
 	filter := bson.M{"_id": messageID}
 
-	_, err = conversationsCollection.DeleteOne(context.Background(), filter)
+	_, err = messagesCollection.DeleteOne(context.Background(), filter)
 	if err != nil {
 		return utils.RespondWithError(c, 400, "Failed to delete message")
 	}
