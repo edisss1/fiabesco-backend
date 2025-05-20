@@ -219,7 +219,7 @@ func EditMessage(c *fiber.Ctx) error {
 		return utils.RespondWithError(c, 404, "Message not found")
 	}
 
-	update := bson.M{"$set": bson.M{"content": payload.NewContent}}
+	update := bson.M{"$set": bson.M{"content": payload.NewContent, "isEdited": true, "updatedAt": time.Now()}}
 
 	_, err = messagesCollection.UpdateOne(context.Background(), filter, update)
 	if err != nil {

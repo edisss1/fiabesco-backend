@@ -5,7 +5,9 @@ import (
 	"github.com/edisss1/fiabesco-backend/handlers/messages"
 	"github.com/edisss1/fiabesco-backend/handlers/post"
 	"github.com/edisss1/fiabesco-backend/handlers/user"
+	"github.com/edisss1/fiabesco-backend/limiters"
 	"github.com/edisss1/fiabesco-backend/middleware"
+	"github.com/edisss1/fiabesco-backend/settings"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -14,6 +16,7 @@ func Setup(app *fiber.App) {
 	userRoutes(app)
 	postRoutes(app)
 	messageRoutes(app)
+	settingsRoutes(app)
 }
 
 func authRoutes(app *fiber.App) {
@@ -63,4 +66,10 @@ func messageRoutes(app *fiber.App) {
 	message.Patch("/:_id", messages.EditMessage)
 	message.Delete("/delete", messages.DeleteMessage)
 
+}
+
+func settingsRoutes(app *fiber.App) {
+	setting := app.Group("/settings", middleware.RequireJWT, limiters.SettingsLimiter())
+
+	setting.Get("/", settings.MockHandler)
 }

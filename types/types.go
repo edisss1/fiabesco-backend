@@ -47,6 +47,7 @@ type Message struct {
 	Read           bool               `json:"read"`
 	CreatedAt      time.Time          `json:"createdAt" bson:"createdAt"`
 	UpdatedAt      time.Time          `json:"updatedAt" bson:"updatedAt"`
+	IsEdited       bool               `json:"isEdited" bson:"isEdited"`
 }
 
 type Conversation struct {
