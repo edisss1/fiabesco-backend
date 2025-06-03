@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/edisss1/fiabesco-backend/db"
+	"github.com/edisss1/fiabesco-backend/handlers/auth"
 	"github.com/edisss1/fiabesco-backend/types"
 	"github.com/edisss1/fiabesco-backend/utils"
 	"github.com/gofiber/fiber/v2"
@@ -11,33 +12,50 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"strings"
+	"time"
 )
 
 var collection *mongo.Collection
 
+type MeRes struct {
+	ID             primitive.ObjectID `json:"_id" bson:"_id"`
+	FirstName      string             `json:"firstName"`
+	LastName       string             `json:"lastName"`
+	Handle         string             `json:"handle"`
+	PhotoURL       string             `json:"photoURL"`
+	Bio            string             `json:"bio"`
+	Settings       *types.Settings    `json:"settings"`
+	CreatedAt      time.Time          `json:"createdAt"`
+	FollowersCount uint32             `json:"followersCount"`
+	FollowingCount uint32             `json:"followingCount"`
+}
+
 func GetUserData(c *fiber.Ctx) error {
-	var body struct {
-		Email string `json:"email"`
+
+	authHeader := c.Get("Authorization")
+
+	if authHeader == "" {
+		return utils.RespondWithError(c, 401, "Unauthorized (in auth header)")
 	}
 
-	var user types.User
+	tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 
-	if err := c.BodyParser(&body); err != nil {
-		return c.Status(404).JSON(fiber.Map{"error": "Invalid credentials"})
+	token, claims, err := auth.VerifyToken(tokenStr)
+
+	if err != nil || token == nil {
+		return utils.RespondWithError(c, 401, "Unauthorized (in token)")
 	}
 
-	if body.Email == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "Body is required"})
-	}
+	var user MeRes
 
 	collection = db.Database.Collection("users")
-	filter := bson.M{"email": body.Email}
+	filter := bson.M{"email": claims.Email}
 
-	err := collection.FindOne(context.Background(), filter).Decode(&user)
+	err = collection.FindOne(context.Background(), filter).Decode(&user)
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid credentials"})
 	}
-	user.Password = ""
 
 	return c.Status(200).JSON(user)
 }

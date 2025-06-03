@@ -67,7 +67,7 @@ func Login(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Incorrect password"})
 	}
 
-	token, err := GenerateToken(user.ID.Hex())
+	token, err := GenerateToken(input.Email)
 
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})

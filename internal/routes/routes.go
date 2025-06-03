@@ -27,7 +27,7 @@ func authRoutes(app *fiber.App) {
 func userRoutes(app *fiber.App) {
 	users := app.Group("/users", middleware.RequireJWT)
 
-	users.Post("/me", user.GetUserData)
+	users.Get("/me", user.GetUserData)
 	users.Patch("/:_id/photo", user.UpdatePhotoURL)
 	users.Get("/profile/:_id", user.GetProfileData)
 	users.Put("/:_id/block", user.BlockUser)
@@ -61,7 +61,7 @@ func messageRoutes(app *fiber.App) {
 	conversations.Post("/start", messages.StartConversation)
 	conversations.Post("/:conversationID/messages/:senderID", messages.SendMessage)
 	conversations.Delete("/:conversationID", messages.DeleteConversation)
-	conversations.Get("/conversation/:conversationID", messages.GetConversation)
+	conversations.Get("/:conversationID", messages.GetConversation)
 	conversations.Get("/:userID", messages.GetConversations)
 	message.Patch("/:_id", messages.EditMessage)
 	message.Delete("/delete", messages.DeleteMessage)
@@ -69,7 +69,8 @@ func messageRoutes(app *fiber.App) {
 }
 
 func settingsRoutes(app *fiber.App) {
-	setting := app.Group("/settings", middleware.RequireJWT, limiters.SettingsLimiter())
+	users := app.Group("/users", middleware.RequireJWT, limiters.SettingsLimiter())
 
-	setting.Get("/", settings.MockHandler)
+	users.Put("/:userID/settings", settings.SaveSettings)
+
 }

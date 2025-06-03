@@ -12,7 +12,6 @@ type User struct {
 	Email          string               `json:"email" bson:"email"`
 	Password       string               `json:"password" bson:"password"`
 	Handle         string               `json:"handle"`
-	Token          string               `json:"token" bson:"token"`
 	PhotoURL       string               `json:"photoURL" bson:"photoURL"`
 	BannerURL      string               `json:"bannerURL" bson:"bannerURL"`
 	FollowersCount uint32               `json:"followersCount" bson:"followersCount"`
@@ -22,6 +21,7 @@ type User struct {
 	FollowedUsers  []string             `json:"followedUsers" bson:"followedUsers"`
 	CreatedAt      time.Time            `json:"createdAt" bson:"createdAt"`
 	BlockedUsers   []primitive.ObjectID `json:"blockedUsers,omitempty" bson:"blockedUsers,omitempty	"`
+	Settings       *Settings            `json:"settings" bson:"settings"`
 }
 
 type Post struct {
@@ -82,4 +82,14 @@ type Comment struct {
 	UserID    primitive.ObjectID `json:"userID" bson:"userID"`
 	Content   string             `json:"content"`
 	CreatedAt time.Time          `json:"createdAt" bson:"createdAt"`
+}
+
+type Settings struct {
+	Theme    string `json:"theme" bson:"theme"`
+	Language string `json:"language"`
+}
+
+type Follow struct {
+	FollowerID  primitive.ObjectID `json:"followerID" bson:"followerID"` // user that follows
+	FollowingID primitive.ObjectID `json:"followedID" bson:"followedID"` // user that is being followed
 }
