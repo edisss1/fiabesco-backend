@@ -15,6 +15,13 @@ import (
 
 var collection *mongo.Collection
 
+type GetBlockedRes struct {
+	ID        primitive.ObjectID `json:"_id" bson:"_id"`
+	PhotoURL  string             `json:"photoURL"`
+	FirstName string             `json:"firstName"`
+	LastName  string             `json:"lastName"`
+}
+
 func FollowUser(c *fiber.Ctx) error {
 	id := c.Params("_id")
 	userID, err := utils.ParseHexID(id)
@@ -126,7 +133,7 @@ func BlockUser(c *fiber.Ctx) error {
 	id := c.Params("userID")
 	userID, err := utils.ParseHexID(id)
 	if err != nil {
-		return utils.RespondWithError(c, 400, "Invalid user ID in params")
+		return utils.RespondWithError(c, 400, "Invalid user ID")
 	}
 
 	var body struct {
@@ -205,4 +212,45 @@ func UnblockUser(c *fiber.Ctx) error {
 
 	return c.Status(200).JSON(fiber.Map{"msg": "User unblocked"})
 
+}
+
+func GetBlockedUsers(c *fiber.Ctx) error {
+	id := c.Params("userID")
+	userID, err := utils.ParseHexID(id)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid user ID")
+	}
+
+	collection = db.Database.Collection("blocked_users")
+	filter := bson.M{"userID": userID}
+
+	resCursor, err := collection.Find(context.Background(), filter)
+
+	var blocks []types.Block
+	var blocked []GetBlockedRes
+
+	err = resCursor.All(context.Background(), &blocks)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Failed to get blocked users"+err.Error())
+	}
+
+	collection = db.Database.Collection("users")
+	blockedIDs := make([]primitive.ObjectID, 0, len(blocks))
+	for _, b := range blocks {
+		blockedIDs = append(blockedIDs, b.BlockedID)
+	}
+
+	collection = db.Database.Collection("users")
+	filter = bson.M{"_id": bson.M{"$in": blockedIDs}}
+
+	cursor, err := collection.Find(context.Background(), filter)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "User fetch error: "+err.Error())
+	}
+
+	if err = cursor.All(context.Background(), &blocked); err != nil {
+		return utils.RespondWithError(c, 500, "User cursor error: "+err.Error())
+	}
+
+	return c.Status(200).JSON(blocked)
 }

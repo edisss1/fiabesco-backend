@@ -36,6 +36,7 @@ func userRoutes(app *fiber.App) {
 	users.Put("/:_id/bio", user.EditBio)
 	users.Get("/:_id/following", social.GetFollowing)
 	users.Post("/:_id/follow", social.FollowUser)
+	users.Get("/:userID/blocked", social.GetBlockedUsers)
 
 }
 
