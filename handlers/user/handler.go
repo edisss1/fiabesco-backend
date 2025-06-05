@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"errors"
 	"github.com/edisss1/fiabesco-backend/db"
 	"github.com/edisss1/fiabesco-backend/handlers/auth"
 	"github.com/edisss1/fiabesco-backend/types"
@@ -11,7 +10,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"strings"
 	"time"
 )
@@ -117,85 +115,6 @@ func GetProfileData(c *fiber.Ctx) error {
 
 }
 
-func BlockUser(c *fiber.Ctx) error {
-	collection = db.Database.Collection("users")
-
-	id := c.Params("_id")
-	userID, err := utils.ParseHexID(id)
-	if err != nil {
-		return utils.RespondWithError(c, 400, "Invalid ID")
-	}
-
-	var user types.User
-
-	var blockedUser struct {
-		ID primitive.ObjectID `json:"id" bson:"id"`
-	}
-
-	if err := c.BodyParser(&blockedUser); err != nil {
-		return utils.RespondWithError(c, 400, "Invalid request body")
-	}
-
-	filter := bson.M{"_id": userID}
-	err = collection.FindOne(context.Background(), filter).Decode(&user)
-	if errors.Is(err, mongo.ErrNoDocuments) {
-		return utils.RespondWithError(c, 404, "User not found")
-	}
-
-	for _, blockedID := range user.BlockedUsers {
-		if blockedID == blockedUser.ID {
-			return utils.RespondWithError(c, 400, "User is already blocked")
-		}
-	}
-
-	user.BlockedUsers = append(user.BlockedUsers, blockedUser.ID)
-
-	update := bson.M{"$set": bson.M{"blockedUsers": user.BlockedUsers}}
-	_, err = collection.UpdateOne(context.Background(), filter, update)
-	if err != nil {
-		return utils.RespondWithError(c, 500, "Failed to update user")
-	}
-
-	return c.Status(200).JSON(fiber.Map{"msg": "User blocked"})
-
-}
-
-func UnblockUser(c *fiber.Ctx) error {
-	collection = db.Database.Collection("users")
-
-	var body struct {
-		UserID        string `json:"userID"`
-		BlockedUserID string `json:"blockedUserID"`
-	}
-
-	if err := c.BodyParser(&body); err != nil {
-		return utils.RespondWithError(c, 400, "Invalid request body")
-	}
-
-	userID, err := utils.ParseHexID(body.UserID)
-	if err != nil {
-		return utils.RespondWithError(c, 400, "Invalid user ID")
-	}
-	blockedUserID, err := utils.ParseHexID(body.BlockedUserID)
-	if err != nil {
-		return utils.RespondWithError(c, 400, "Invalid blocked user ID")
-	}
-	filter := bson.M{"_id": userID}
-	update := bson.D{
-		{"$pull", bson.D{
-			{"blockedUsers", blockedUserID},
-		}},
-	}
-
-	_, err = collection.UpdateOne(context.Background(), filter, update)
-	if err != nil {
-		return utils.RespondWithError(c, 400, "Error unblocking user")
-	}
-
-	return c.Status(200).JSON(fiber.Map{"msg": "User unblocked"})
-
-}
-
 func EditBio(c *fiber.Ctx) error {
 	id := c.Params("_id")
 	userID, err := utils.ParseHexID(id)
@@ -227,111 +146,4 @@ func EditBio(c *fiber.Ctx) error {
 	}
 
 	return c.Status(200).JSON(fiber.Map{"newBio": body.Bio})
-}
-
-func GetFollowing(c *fiber.Ctx) error {
-	id := c.Params("_id")
-	userID, err := utils.ParseHexID(id)
-	if err != nil {
-		return utils.RespondWithError(c, 400, "Invalid user ID")
-	}
-
-	collection := db.Database.Collection("users")
-
-	var user types.User
-	userFilter := bson.M{"_id": userID}
-
-	err = collection.FindOne(context.Background(), userFilter).Decode(&user)
-	if err != nil {
-		return utils.RespondWithError(c, 404, "User not found")
-	}
-
-	var followedUserIDs []primitive.ObjectID
-	for _, followedID := range user.FollowedUsers {
-		fid, err := utils.ParseHexID(followedID)
-		if err != nil {
-			return utils.RespondWithError(c, 400, "Invalid followed user ID")
-		}
-		followedUserIDs = append(followedUserIDs, fid)
-	}
-
-	filter := bson.M{"_id": bson.M{"$in": followedUserIDs}}
-
-	projection := bson.M{
-		"firstName": 1,
-		"lastName":  1,
-		"handle":    1,
-		"photoURL":  1,
-		"bio":       1,
-		"_id":       1,
-	}
-
-	opts := options.Find().SetProjection(projection)
-
-	cursor, err := collection.Find(context.Background(), filter, opts)
-	if err != nil {
-		return utils.RespondWithError(c, 500, "Database error: "+err.Error())
-	}
-	defer cursor.Close(context.Background())
-
-	var followed []types.User
-	if err := cursor.All(context.Background(), &followed); err != nil {
-		return utils.RespondWithError(c, 500, "Failed to decode followed users")
-	}
-
-	return c.Status(200).JSON(followed)
-}
-
-func FollowUser(c *fiber.Ctx) error {
-	id := c.Params("_id")
-	userID, err := utils.ParseHexID(id)
-	if err != nil {
-		return utils.RespondWithError(c, 400, "Invalid user ID")
-	}
-
-	var body struct {
-		ID string `json:"id"`
-	}
-
-	if err := c.BodyParser(&body); err != nil {
-		return utils.RespondWithError(c, 400, "Missing or invalid request body")
-	}
-
-	collection := db.Database.Collection("users")
-
-	var user types.User
-	filter := bson.M{"_id": userID}
-	err = collection.FindOne(context.Background(), filter).Decode(&user)
-	if err != nil {
-		return utils.RespondWithError(c, 404, "User not found")
-	}
-
-	for _, followedID := range user.FollowedUsers {
-		if followedID == body.ID {
-			return utils.RespondWithError(c, 400, "Already following this user")
-		}
-
-	}
-
-	update := bson.M{"$push": bson.M{"followedUsers": body.ID}}
-
-	_, err = collection.UpdateOne(context.Background(), filter, update)
-	if err != nil {
-		return utils.RespondWithError(c, 500, "Failed to follow the user")
-	}
-
-	incrementFollowers := bson.M{"$inc": bson.M{"followersCount": 1}}
-	incrementFollowed := bson.M{"$inc": bson.M{"followingCount": 1}}
-
-	followerID, err := utils.ParseHexID(body.ID)
-	if err != nil {
-		return utils.RespondWithError(c, 400, "Invalid follower ID")
-	}
-
-	followerFilter := bson.M{"_id": followerID}
-
-	_, err = collection.UpdateOne(context.Background(), filter, incrementFollowers)
-	_, err = collection.UpdateOne(context.Background(), followerFilter, incrementFollowed)
-
-	return c.Status(200).JSON(fiber.Map{"msg": "Successfully followed the user"})
 }

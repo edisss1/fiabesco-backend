@@ -6,22 +6,21 @@ import (
 )
 
 type User struct {
-	ID             primitive.ObjectID   `json:"_id,omitempty" bson:"_id,omitempty"`
-	FirstName      string               `json:"firstName" bson:"firstName"`
-	LastName       string               `json:"lastName" bson:"lastName"`
-	Email          string               `json:"email" bson:"email"`
-	Password       string               `json:"password" bson:"password"`
-	Handle         string               `json:"handle"`
-	PhotoURL       string               `json:"photoURL" bson:"photoURL"`
-	BannerURL      string               `json:"bannerURL" bson:"bannerURL"`
-	FollowersCount uint32               `json:"followersCount" bson:"followersCount"`
-	FollowingCount uint32               `json:"followingCount" bson:"followingCount"`
-	Bio            string               `json:"bio" bson:"bio"`
-	FollowedBy     []string             `json:"followedBy" bson:"followedBy"`
-	FollowedUsers  []string             `json:"followedUsers" bson:"followedUsers"`
-	CreatedAt      time.Time            `json:"createdAt" bson:"createdAt"`
-	BlockedUsers   []primitive.ObjectID `json:"blockedUsers,omitempty" bson:"blockedUsers,omitempty	"`
-	Settings       *Settings            `json:"settings" bson:"settings"`
+	ID             primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
+	FirstName      string             `json:"firstName" bson:"firstName"`
+	LastName       string             `json:"lastName" bson:"lastName"`
+	Email          string             `json:"email" bson:"email"`
+	Password       string             `json:"password" bson:"password"`
+	Handle         string             `json:"handle"`
+	PhotoURL       string             `json:"photoURL" bson:"photoURL"`
+	BannerURL      string             `json:"bannerURL" bson:"bannerURL"`
+	FollowersCount uint32             `json:"followersCount" bson:"followersCount"`
+	FollowingCount uint32             `json:"followingCount" bson:"followingCount"`
+	Bio            string             `json:"bio" bson:"bio"`
+	FollowedBy     []string           `json:"followedBy" bson:"followedBy"`
+	FollowedUsers  []string           `json:"followedUsers" bson:"followedUsers"`
+	CreatedAt      time.Time          `json:"createdAt" bson:"createdAt"`
+	Settings       *Settings          `json:"settings" bson:"settings"`
 }
 
 type Post struct {
@@ -92,4 +91,11 @@ type Settings struct {
 type Follow struct {
 	FollowerID  primitive.ObjectID `json:"followerID" bson:"followerID"` // user that follows
 	FollowingID primitive.ObjectID `json:"followedID" bson:"followedID"` // user that is being followed
+}
+
+type Block struct {
+	ID        primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
+	UserID    primitive.ObjectID `json:"userID" bson:"userID"`       // who is blocking
+	BlockedID primitive.ObjectID `json:"blockedID" bson:"blockedID"` // who is being blocked
+	CreatedAt time.Time          `json:"createdAt" bson:"createdAt"`
 }

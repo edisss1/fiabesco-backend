@@ -8,6 +8,7 @@ import (
 	"github.com/edisss1/fiabesco-backend/limiters"
 	"github.com/edisss1/fiabesco-backend/middleware"
 	"github.com/edisss1/fiabesco-backend/settings"
+	"github.com/edisss1/fiabesco-backend/social"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -30,11 +31,11 @@ func userRoutes(app *fiber.App) {
 	users.Get("/me", user.GetUserData)
 	users.Patch("/:_id/photo", user.UpdatePhotoURL)
 	users.Get("/profile/:_id", user.GetProfileData)
-	users.Put("/:_id/block", user.BlockUser)
-	users.Put("/unblock", user.UnblockUser)
+	users.Post("/:userID/block", social.BlockUser)
+	users.Delete("/:userID/unblock", social.UnblockUser)
 	users.Put("/:_id/bio", user.EditBio)
-	users.Get("/:_id/following", user.GetFollowing)
-	users.Post("/:_id/follow", user.FollowUser)
+	users.Get("/:_id/following", social.GetFollowing)
+	users.Post("/:_id/follow", social.FollowUser)
 
 }
 
