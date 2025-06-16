@@ -99,3 +99,32 @@ type Block struct {
 	BlockedID primitive.ObjectID `json:"blockedID" bson:"blockedID"` // who is being blocked
 	CreatedAt time.Time          `json:"createdAt" bson:"createdAt"`
 }
+
+type Portfolio struct {
+	ID          string               `json:"_id,omitempty"`
+	UserID      string               `json:"userID"`
+	About       string               `json:"about"`
+	Projects    []PortfolioProject   `json:"projects"`
+	Appearance  PortfolioAppearance  `json:"appearance"`
+	ContactInfo PortfolioContactInfo `json:"contactInfo"`
+}
+
+type PortfolioProject struct {
+	Img   string `json:"img"`
+	Title string `json:"title"`
+	Link  string `json:"link"`
+}
+
+type PortfolioAppearance struct {
+	TextColor    string `json:"textColor"`
+	BgColor      string `json:"bgColor"`
+	PrimaryColor string `json:"primaryColor"`
+}
+
+type PortfolioContactInfo struct {
+	Email                 string `json:"email"`
+	BehanceProfileLink    string `json:"behanceProfileLink"`
+	DribbbleProfileLink   string `json:"dribbbleProfileLink"`
+	PinterestProfileLink  string `json:"pinterestProfileLink"`
+	ArtStationProfileLink string `json:"artStationProfileLink"`
+}
