@@ -42,7 +42,7 @@ type Message struct {
 	ConversationID primitive.ObjectID `json:"conversationID,omitempty" bson:"conversationID"`
 	SenderID       primitive.ObjectID `json:"senderID" bson:"senderID"`
 	Content        string             `json:"content"`
-	Files          []string           `json:"files"`
+	Files          []string           `json:"uploads"`
 	Read           bool               `json:"read"`
 	CreatedAt      time.Time          `json:"createdAt" bson:"createdAt"`
 	UpdatedAt      time.Time          `json:"updatedAt" bson:"updatedAt"`
