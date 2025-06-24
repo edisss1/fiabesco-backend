@@ -101,12 +101,13 @@ type Block struct {
 }
 
 type Portfolio struct {
-	ID          string               `json:"_id,omitempty"`
-	UserID      string               `json:"userID"`
+	ID          string               `json:"_id,omitempty" bson:"_id,omitempty"`
+	UserID      string               `json:"userID" bson:"userID"`
+	AllowEmails bool                 `json:"allowEmails" bson:"allowEmails"`
 	About       string               `json:"about"`
 	Projects    []PortfolioProject   `json:"projects"`
 	Appearance  PortfolioAppearance  `json:"appearance"`
-	ContactInfo PortfolioContactInfo `json:"contactInfo"`
+	ContactInfo PortfolioContactInfo `json:"contactInfo" bson:"contactInfo"`
 }
 
 type PortfolioProject struct {
@@ -116,15 +117,15 @@ type PortfolioProject struct {
 }
 
 type PortfolioAppearance struct {
-	TextColor    string `json:"textColor"`
-	BgColor      string `json:"bgColor"`
-	PrimaryColor string `json:"primaryColor"`
+	TextColor    string `json:"textColor" bson:"textColor"`
+	BgColor      string `json:"bgColor" bson:"bgColor"`
+	PrimaryColor string `json:"primaryColor" bson:"primaryColor"`
 }
 
 type PortfolioContactInfo struct {
 	Email                 string `json:"email"`
-	BehanceProfileLink    string `json:"behanceProfileLink"`
-	DribbbleProfileLink   string `json:"dribbbleProfileLink"`
-	PinterestProfileLink  string `json:"pinterestProfileLink"`
-	ArtStationProfileLink string `json:"artStationProfileLink"`
+	BehanceProfileLink    string `json:"behanceProfileLink" bson:"behanceProfileLink"`
+	DribbbleProfileLink   string `json:"dribbbleProfileLink" bson:"dribbbleProfileLink"`
+	PinterestProfileLink  string `json:"pinterestProfileLink" bson:"pinterestProfileLink"`
+	ArtStationProfileLink string `json:"artStationProfileLink" bson:"artStationProfileLink"`
 }

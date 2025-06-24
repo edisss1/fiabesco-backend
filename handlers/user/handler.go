@@ -20,6 +20,7 @@ type MeRes struct {
 	ID             primitive.ObjectID `json:"_id" bson:"_id"`
 	FirstName      string             `json:"firstName"`
 	LastName       string             `json:"lastName"`
+	Email          string             `json:"email"`
 	Handle         string             `json:"handle"`
 	PhotoURL       string             `json:"photoURL"`
 	Bio            string             `json:"bio"`

@@ -1,18 +1,16 @@
 package routes
 
 import (
-	"github.com/edisss1/fiabesco-backend/db"
 	"github.com/edisss1/fiabesco-backend/handlers/auth"
 	"github.com/edisss1/fiabesco-backend/handlers/messages"
+	"github.com/edisss1/fiabesco-backend/handlers/portfolio"
 	"github.com/edisss1/fiabesco-backend/handlers/post"
 	"github.com/edisss1/fiabesco-backend/handlers/user"
 	"github.com/edisss1/fiabesco-backend/limiters"
 	"github.com/edisss1/fiabesco-backend/middleware"
 	"github.com/edisss1/fiabesco-backend/settings"
 	"github.com/edisss1/fiabesco-backend/social"
-	"github.com/edisss1/fiabesco-backend/uploads"
 	"github.com/gofiber/fiber/v2"
-	"go.mongodb.org/mongo-driver/mongo/gridfs"
 )
 
 func Setup(app *fiber.App) {
@@ -21,7 +19,7 @@ func Setup(app *fiber.App) {
 	postRoutes(app)
 	messageRoutes(app)
 	settingsRoutes(app)
-	uploadRoutes(app)
+	portfolioRoutes(app)
 }
 
 func authRoutes(app *fiber.App) {
@@ -81,26 +79,9 @@ func settingsRoutes(app *fiber.App) {
 
 }
 
-func uploadRoutes(app *fiber.App) {
-	app.Post("/upload", func(c *fiber.Ctx) error {
+func portfolioRoutes(app *fiber.App) {
+	portfolios := app.Group("/portfolios/:userID", middleware.RequireJWT)
 
-		bucket, _ := gridfs.NewBucket(db.Database)
-
-		// avatar: single file
-		attachmentID, err := uploads.UploadFile(c, "attachment", bucket, false)
-		if err != nil {
-			return err
-		}
-
-		// gallery: multiple files
-		galleryIDs, err := uploads.UploadFile(c, "files", bucket, true)
-		if err != nil {
-			return err
-		}
-
-		return c.JSON(fiber.Map{
-			"attachment": attachmentID,
-			"gallery":    galleryIDs,
-		})
-	})
+	portfolios.Post("/create/", portfolio.CreatePortfolio)
+	portfolios.Get("/", portfolio.GetPortfolio)
 }
