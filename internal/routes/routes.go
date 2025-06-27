@@ -31,7 +31,6 @@ func userRoutes(app *fiber.App) {
 	users := app.Group("/users", middleware.RequireJWT)
 
 	users.Get("/me", user.GetUserData)
-	users.Patch("/:_id/photo", user.UpdatePhotoURL)
 	users.Get("/profile/:_id", user.GetProfileData)
 	users.Post("/:userID/block", social.BlockUser)
 	users.Delete("/:userID/unblock", social.UnblockUser)
@@ -39,6 +38,7 @@ func userRoutes(app *fiber.App) {
 	users.Get("/:_id/following", social.GetFollowing)
 	users.Post("/:_id/follow", social.FollowUser)
 	users.Get("/:userID/blocked", social.GetBlockedUsers)
+	users.Put("/:userID/pfp", user.ChangePFP)
 
 }
 
