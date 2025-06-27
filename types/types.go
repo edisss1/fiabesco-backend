@@ -103,6 +103,7 @@ type Block struct {
 type Portfolio struct {
 	ID          string               `json:"_id,omitempty" bson:"_id,omitempty"`
 	UserID      string               `json:"userID" bson:"userID"`
+	UserName    string               `bson:"-"`
 	AllowEmails bool                 `json:"allowEmails" bson:"allowEmails"`
 	About       string               `json:"about"`
 	Projects    []PortfolioProject   `json:"projects"`
