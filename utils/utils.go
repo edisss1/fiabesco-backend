@@ -1,11 +1,14 @@
 package utils
 
 import (
+	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"math/rand"
 	"reflect"
 )
+
+var baseImgURL = "http://localhost:3000/images"
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
@@ -68,4 +71,8 @@ func DiffStructs(prefix string, oldVal, newVal reflect.Value, changes map[string
 			}
 		}
 	}
+}
+
+func BuildImgURL(imageID string) string {
+	return fmt.Sprintf("%s/%s", baseImgURL, imageID)
 }

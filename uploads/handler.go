@@ -1,10 +1,14 @@
 package uploads
 
 import (
+	"bytes"
+	"github.com/edisss1/fiabesco-backend/db"
+	"github.com/edisss1/fiabesco-backend/utils"
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/gridfs"
 	"io"
+	"net/http"
 )
 
 func UploadFile(c *fiber.Ctx, field string, bucket *gridfs.Bucket, allowMultiple bool) ([]primitive.ObjectID, error) {
@@ -53,4 +57,29 @@ func UploadFile(c *fiber.Ctx, field string, bucket *gridfs.Bucket, allowMultiple
 
 	}
 	return uploadedIDs, nil
+}
+
+func ServeImage(c *fiber.Ctx) error {
+	id := c.Params("imageID")
+	imageID, err := utils.ParseHexID(id)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid image ID")
+	}
+
+	bucket, err := gridfs.NewBucket(db.Database)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Failed to create bucket")
+	}
+
+	var buf bytes.Buffer
+	_, err = bucket.DownloadToStream(imageID, &buf)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Failed to download image")
+	}
+	contentType := http.DetectContentType(buf.Bytes())
+	c.Set("Content-Type", contentType)
+	c.Set("Content-Disposition", "inline")
+
+	return c.Send(buf.Bytes())
+
 }

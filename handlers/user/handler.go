@@ -1,9 +1,7 @@
 package user
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
 	"github.com/edisss1/fiabesco-backend/db"
 	"github.com/edisss1/fiabesco-backend/handlers/auth"
 	"github.com/edisss1/fiabesco-backend/types"
@@ -14,7 +12,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/gridfs"
-	"io"
 	"strings"
 	"time"
 )
@@ -40,7 +37,7 @@ func GetUserData(c *fiber.Ctx) error {
 	authHeader := c.Get("Authorization")
 
 	if authHeader == "" {
-		return utils.RespondWithError(c, 401, "Unauthorized (in auth header)")
+		return utils.RespondWithError(c, 401, "Unauthorized")
 	}
 
 	tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
@@ -48,7 +45,7 @@ func GetUserData(c *fiber.Ctx) error {
 	token, claims, err := auth.VerifyToken(tokenStr)
 
 	if err != nil || token == nil {
-		return utils.RespondWithError(c, 401, "Unauthorized (in token)")
+		return utils.RespondWithError(c, 401, "Unauthorized")
 	}
 
 	var user MeRes
@@ -60,24 +57,9 @@ func GetUserData(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid credentials"})
 	}
-	bucket, err := gridfs.NewBucket(db.Database)
-	if err != nil {
-		return utils.RespondWithError(c, 500, "Failed to create bucket")
-	}
+
 	if user.PhotoURL != "" {
-		fileID, err := utils.ParseHexID(user.PhotoURL)
-		if err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": "Invalid ID"})
-		}
-		var buf bytes.Buffer
-		downloadStream, err := bucket.OpenDownloadStream(fileID)
-		if err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": "Invalid ID"})
-		}
-		io.Copy(&buf, downloadStream)
-		downloadStream.Close()
-		base64Img := base64.StdEncoding.EncodeToString(buf.Bytes())
-		user.PhotoURL = "data:image/jpeg;base64," + base64Img
+		user.PhotoURL = utils.BuildImgURL(user.PhotoURL)
 	}
 
 	return c.Status(200).JSON(user)
@@ -98,24 +80,11 @@ func GetProfileData(c *fiber.Ctx) error {
 	filter := bson.M{"_id": objectID}
 
 	err = collection.FindOne(context.Background(), filter).Decode(&user)
-	bucket, err := gridfs.NewBucket(db.Database)
-	if err != nil {
-		return utils.RespondWithError(c, 500, "Failed to create bucket")
-	}
+
 	if user.PhotoURL != "" {
-		fileID, err := utils.ParseHexID(user.PhotoURL)
-		if err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": "Invalid ID"})
+		if user.PhotoURL != "" {
+			user.PhotoURL = utils.BuildImgURL(user.PhotoURL)
 		}
-		var buf bytes.Buffer
-		downloadStream, err := bucket.OpenDownloadStream(fileID)
-		if err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": "Invalid ID"})
-		}
-		io.Copy(&buf, downloadStream)
-		downloadStream.Close()
-		base64Img := base64.StdEncoding.EncodeToString(buf.Bytes())
-		user.PhotoURL = "data:image/jpeg;base64," + base64Img
 	}
 
 	user.Password = ""

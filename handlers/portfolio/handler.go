@@ -1,9 +1,7 @@
 package portfolio
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/edisss1/fiabesco-backend/db"
@@ -14,7 +12,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/gridfs"
-	"io"
 )
 
 var collection *mongo.Collection
@@ -75,25 +72,12 @@ func GetPortfolio(c *fiber.Ctx) error {
 		return utils.RespondWithError(c, 500, "Failed to get portfolio "+err.Error())
 	}
 
-	bucket, err := gridfs.NewBucket(db.Database)
-	if err != nil {
-		return utils.RespondWithError(c, 500, "Failed to create bucket")
-	}
-
 	for i, project := range portfolio.Projects {
-		fileID, err := utils.ParseHexID(project.Img)
+
 		if err != nil {
 			continue
 		}
-		var buf bytes.Buffer
-		downloadStream, err := bucket.OpenDownloadStream(fileID)
-		if err != nil {
-			continue
-		}
-		io.Copy(&buf, downloadStream)
-		downloadStream.Close()
-		base64Img := base64.StdEncoding.EncodeToString(buf.Bytes())
-		portfolio.Projects[i].Img = "data:image/jpeg;base64," + base64Img
+		portfolio.Projects[i].Img = utils.BuildImgURL(project.Img)
 	}
 
 	var user types.User

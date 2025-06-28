@@ -10,6 +10,7 @@ import (
 	"github.com/edisss1/fiabesco-backend/middleware"
 	"github.com/edisss1/fiabesco-backend/settings"
 	"github.com/edisss1/fiabesco-backend/social"
+	"github.com/edisss1/fiabesco-backend/uploads"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -20,6 +21,7 @@ func Setup(app *fiber.App) {
 	messageRoutes(app)
 	settingsRoutes(app)
 	portfolioRoutes(app)
+	servingRoutes(app)
 }
 
 func authRoutes(app *fiber.App) {
@@ -84,4 +86,10 @@ func portfolioRoutes(app *fiber.App) {
 
 	portfolios.Post("/create/", portfolio.CreatePortfolio)
 	portfolios.Get("/", portfolio.GetPortfolio)
+}
+
+func servingRoutes(app *fiber.App) {
+	images := app.Group("/images")
+
+	images.Get("/:imageID", uploads.ServeImage)
 }
