@@ -12,6 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/gridfs"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -82,9 +83,10 @@ func GetProfileData(c *fiber.Ctx) error {
 	err = collection.FindOne(context.Background(), filter).Decode(&user)
 
 	if user.PhotoURL != "" {
-		if user.PhotoURL != "" {
-			user.PhotoURL = utils.BuildImgURL(user.PhotoURL)
-		}
+		user.PhotoURL = utils.BuildImgURL(user.PhotoURL)
+	}
+	if user.BannerURL != "" {
+		user.BannerURL = utils.BuildImgURL(user.BannerURL)
 	}
 
 	user.Password = ""
@@ -156,4 +158,30 @@ func ChangePFP(c *fiber.Ctx) error {
 
 	return c.Status(200).JSON(fiber.Map{"msg": "PFP updated successfully" + ids[0].Hex()})
 
+}
+
+func UploadBanner(c *fiber.Ctx) error {
+	id := c.Params("userID")
+	userID, err := utils.ParseHexID(id)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid user ID "+err.Error())
+	}
+
+	bucket, err := gridfs.NewBucket(db.Database)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Failed to create bucket")
+	}
+	collection := db.Database.Collection("users")
+
+	ids, err := uploads.UploadFile(c, "banner", bucket, false)
+
+	filter := bson.M{"_id": userID}
+	update := bson.M{"$set": bson.M{"bannerURL": ids[0].Hex()}}
+
+	_, err = collection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return utils.RespondWithError(c, 500, err.Error())
+	}
+
+	return c.Status(http.StatusOK).JSON(fiber.Map{"msg": "Banner updated successfully"})
 }

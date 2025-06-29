@@ -41,6 +41,7 @@ func userRoutes(app *fiber.App) {
 	users.Post("/:_id/follow", social.FollowUser)
 	users.Get("/:userID/blocked", social.GetBlockedUsers)
 	users.Put("/:userID/pfp", user.ChangePFP)
+	users.Put("/:userID/banner", user.UploadBanner)
 
 }
 
