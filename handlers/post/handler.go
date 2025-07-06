@@ -120,29 +120,6 @@ func GetPostsByUser(c *fiber.Ctx) error {
 		}}},
 	}
 
-	//pipeline := mongo.Pipeline{
-	//	bson.D{{"$match", bson.D{{"userID", userID}}}},
-	//	bson.D{{"$sort", bson.D{{"createdAt", -1}}}},
-	//	bson.D{{"$skip", skip}},
-	//	bson.D{{"$limit", limit}},
-	//	bson.D{{"$lookup", bson.D{
-	//		{"from", "users"},
-	//		{"localField", "userID"},
-	//		{"foreignField", "_id"},
-	//		{"as", "user"},
-	//	}}},
-	//	bson.D{{"$unwind", "$user"}},
-	//	bson.D{{"$project", bson.D{
-	//		{"post", "$$ROOT"},
-	//		{"user", 1},
-	//	}}},
-	//	bson.D{{"$project", bson.D{
-	//		{"userName", bson.D{{"$concat", bson.A{"$user.firstName", " ", "$user.lastName"}}}},
-	//		{"photoURL", "$user.photoURL"},
-	//		{"handle", "$user.handle"},
-	//	}}},
-	//}
-
 	cursor, err := collection.Aggregate(context.Background(), pipeline)
 	if err != nil {
 		return utils.RespondWithError(c, 500, "Failed to fetch posts: "+err.Error())
@@ -199,28 +176,55 @@ func GetPost(c *fiber.Ctx) error {
 		return utils.RespondWithError(c, 400, "Invalid ID")
 	}
 
-	var res struct {
-		post types.Post
-		user types.User
+	pipeline := mongo.Pipeline{
+		bson.D{{"$match", bson.D{{"_id", postID}}}},
+		bson.D{{"$sort", bson.D{{"createdAt", -1}}}},
+
+		bson.D{{"$lookup", bson.D{
+			{"from", "users"},
+			{"localField", "userID"},
+			{"foreignField", "_id"},
+			{"as", "user"},
+		}}},
+
+		bson.D{{"$unwind", bson.D{
+			{"path", "$user"},
+			{"preserveNullAndEmptyArrays", true},
+		}}},
+
+		bson.D{{"$project", bson.D{
+			{"post", "$$ROOT"},
+			{"userName", bson.D{{"$concat", bson.A{"$user.firstName", " ", "$user.lastName"}}}},
+
+			{"photoURL", "$user.photoURL"},
+			{"handle", "$user.handle"},
+		}}},
 	}
 
-	collection = db.Database.Collection("posts")
+	var result FeedItem
 
-	postFilter := bson.M{"_id": postID}
+	collection := db.Database.Collection("posts")
 
-	err = collection.FindOne(context.Background(), postFilter).Decode(&res.post)
+	cursor, err := collection.Aggregate(context.Background(), pipeline)
 	if err != nil {
-		return utils.RespondWithError(c, 500, "Failed to decode post")
+		return utils.RespondWithError(c, 500, "Failed to fetch posts: "+err.Error())
 	}
 
-	userFilter := bson.M{"_id": res.post.UserID}
-	collection = db.Database.Collection("users")
+	for cursor.Next(context.Background()) {
+		if err := cursor.Decode(&result); err != nil {
+			return utils.RespondWithError(c, 500, "Failed to decode post: "+err.Error())
+		}
+		if result.PhotoURL != "" {
+			result.PhotoURL = utils.BuildImgURL(result.PhotoURL)
+		}
+		if result.Post.Images != nil {
+			for i := range result.Post.Images {
+				result.Post.Images[i] = utils.BuildImgURL(result.Post.Images[i])
+			}
+		}
+	}
 
-	err = collection.FindOne(context.Background(), userFilter).Decode(&res.user)
-	res.user.Password = ""
-	res.user.Email = ""
-
-	return c.Status(200).JSON(fiber.Map{"post": res.post, "user": res.user})
+	return c.Status(200).JSON(result)
 }
 
 func GetFeedPosts(c *fiber.Ctx) error {
