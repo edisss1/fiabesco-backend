@@ -49,7 +49,7 @@ func postRoutes(app *fiber.App) {
 	users := app.Group("/users", middleware.RequireJWT)
 	posts := app.Group("/posts", middleware.RequireJWT)
 
-	users.Post("/:_id/posts", post.CreatePost)
+	users.Post("/:userID/posts", post.CreatePost)
 	users.Get("/:_id/post", post.GetPostsByUser)
 	users.Delete("/:_id/posts/:postID", post.DeletePost)
 	posts.Get("/feed", post.GetFeedPosts)

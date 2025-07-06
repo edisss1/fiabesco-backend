@@ -2,14 +2,17 @@ package post
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"github.com/edisss1/fiabesco-backend/db"
 	"github.com/edisss1/fiabesco-backend/types"
+	"github.com/edisss1/fiabesco-backend/uploads"
 	"github.com/edisss1/fiabesco-backend/utils"
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/gridfs"
 	"strconv"
 	"strings"
 	"time"
@@ -17,35 +20,56 @@ import (
 
 // TODO: update other functions to behave like GetPostsByUser
 
+type FeedItem struct {
+	Post     types.Post `json:"post"`
+	UserName string     `json:"userName" bson:"userName"`
+	PhotoURL string     `json:"photoURL" bson:"photoURL"`
+	Handle   string     `json:"handle"`
+}
+
 var collection *mongo.Collection
 
 func CreatePost(c *fiber.Ctx) error {
-	id := c.Params("_id")
+	id := c.Params("userID")
 	userID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid ID"})
 	}
 
+	postJSON := c.FormValue("post")
+	var post types.Post
+
+	if err := json.Unmarshal([]byte(postJSON), &post); err != nil {
+		return utils.RespondWithError(c, 400, "Invalid request body"+err.Error())
+	}
+
+	bucket, err := gridfs.NewBucket(db.Database)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Error creating bucket")
+	}
+
+	for i := range post.Images {
+		fieldName := fmt.Sprintf("post-img-%d", i)
+		ids, err := uploads.UploadFile(c, fieldName, bucket, false)
+		if err != nil {
+			continue
+		}
+		if len(ids) > 0 {
+			post.Images[i] = ids[0].Hex()
+		}
+	}
+
+	post.UserID = userID
 	collection = db.Database.Collection("posts")
 
-	var body struct {
-		Caption string `json:"caption"`
-	}
-	if err := c.BodyParser(&body); err != nil {
-		return utils.RespondWithError(c, 400, "Invalid request body")
+	_, err = collection.InsertOne(context.Background(), post)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Failed to create post "+err.Error())
 	}
 
-	newPost := types.Post{
-		UserID:    userID,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-		Caption:   body.Caption,
-	}
+	fmt.Println(post)
 
-	res, err := collection.InsertOne(context.Background(), newPost)
-	newPost.ID = res.InsertedID.(primitive.ObjectID)
-
-	return c.Status(201).JSON(newPost)
+	return c.Status(201).JSON(fiber.Map{"post": post})
 }
 
 func GetPostsByUser(c *fiber.Ctx) error {
@@ -157,105 +181,71 @@ func GetPost(c *fiber.Ctx) error {
 }
 
 func GetFeedPosts(c *fiber.Ctx) error {
-	sampleSizeParam := c.Query("sample", "0")
-	limitParam := c.Query("limit", "10")
-	skipParam := c.Query("skip", "0")
+	pageParam := c.Query("page", "1")
 
-	sampleSize, _ := strconv.Atoi(sampleSizeParam)
-	limit, _ := strconv.Atoi(limitParam)
-	skip, _ := strconv.Atoi(skipParam)
+	l := 10
+	p, _ := strconv.Atoi(pageParam)
+	skip := int64(p*l - l)
 
-	postsCollection := db.Database.Collection("posts")
-	usersCollection := db.Database.Collection("users")
+	limit := int64(l)
 
-	var feedItems []struct {
-		Post types.Post `json:"post"`
-		User types.User `json:"user"`
+	//opt := options.FindOptions{Limit: &limit, Skip: &skip}
+
+	pipeline := mongo.Pipeline{
+
+		bson.D{{"$sort", bson.D{{"createdAt", -1}}}},
+
+		// Pagination
+		bson.D{{"$skip", skip}},
+		bson.D{{"$limit", limit}},
+
+		bson.D{{"$lookup", bson.D{
+			{"from", "users"},
+			{"localField", "userID"},
+			{"foreignField", "_id"},
+			{"as", "user"},
+		}}},
+
+		bson.D{{"$unwind", bson.D{
+			{"path", "$user"},
+			{"preserveNullAndEmptyArrays", true},
+		}}},
+
+		bson.D{{"$project", bson.D{
+			{"post", "$$ROOT"},
+			{"userName", bson.D{{"$concat", bson.A{"$user.firstName", " ", "$user.lastName"}}}},
+
+			{"photoURL", "$user.photoURL"},
+			{"handle", "$user.handle"},
+		}}},
 	}
 
-	if sampleSize > 0 {
-		effectiveSampleSize := sampleSize + skip + limit
-
-		pipeline := []bson.M{
-			{"$sample": bson.M{"size": effectiveSampleSize}},
-			{"$sort": bson.M{"createdAt": -1}},
-			{"$skip": skip},
-			{"$limit": limit},
-		}
-
-		cursor, err := postsCollection.Aggregate(context.Background(), pipeline)
-		if err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch posts"})
-		}
-		defer cursor.Close(context.Background())
-
-		for cursor.Next(context.Background()) {
-			var feedItem struct {
-				Post types.Post `json:"post"`
-				User types.User `json:"user"`
-			}
-			if err := cursor.Decode(&feedItem.Post); err != nil {
-				return utils.RespondWithError(c, 500, "Failed to decode post: "+err.Error())
-			}
-
-			filter := bson.M{"_id": feedItem.Post.UserID}
-			if err := usersCollection.FindOne(context.Background(), filter).Decode(&feedItem.User); err != nil {
-				return utils.RespondWithError(c, 500, "Failed to fetch user: "+err.Error())
-			}
-			feedItem.User.Password = ""
-			feedItem.User.Email = ""
-
-			feedItems = append(feedItems, feedItem)
-		}
-	} else {
-		opts := options.Find().
-			SetLimit(int64(limit)).
-			SetSkip(int64(skip)).
-			SetSort(bson.D{{Key: "createdAt", Value: -1}})
-
-		cursor, err := postsCollection.Find(context.Background(), bson.M{}, opts)
-		if err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch posts"})
-		}
-		defer cursor.Close(context.Background())
-
-		for cursor.Next(context.Background()) {
-			var feedItem struct {
-				Post types.Post `json:"post"`
-				User types.User `json:"user"`
-			}
-			if err := cursor.Decode(&feedItem.Post); err != nil {
-				return utils.RespondWithError(c, 500, "Failed to decode post: "+err.Error())
-			}
-
-			filter := bson.M{"_id": feedItem.Post.UserID}
-			if err := usersCollection.FindOne(context.Background(), filter).Decode(&feedItem.User); err != nil {
-				return utils.RespondWithError(c, 500, "Failed to fetch user: "+err.Error())
-			}
-			feedItem.User.Password = ""
-			feedItem.User.Email = ""
-
-			feedItems = append(feedItems, feedItem)
-		}
-	}
-
-	totalCount, err := postsCollection.CountDocuments(context.Background(), bson.M{})
+	collection := db.Database.Collection("posts")
+	cursor, err := collection.Aggregate(context.Background(), pipeline)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to count posts"})
+		return utils.RespondWithError(c, 500, "Failed to fetch posts "+err.Error())
 	}
 
-	hasMore := false
-	if sampleSize > 0 {
-		hasMore = len(feedItems) >= limit
-	} else {
-		hasMore = (skip + limit) < int(totalCount)
+	var result []FeedItem
+
+	for cursor.Next(context.Background()) {
+		var feedItem FeedItem
+		if err := cursor.Decode(&feedItem); err != nil {
+			return utils.RespondWithError(c, 500, "Failed to decode post: "+err.Error())
+		}
+		if feedItem.PhotoURL != "" {
+			feedItem.PhotoURL = utils.BuildImgURL(feedItem.PhotoURL)
+		}
+		if feedItem.Post.Images != nil {
+			for i := range feedItem.Post.Images {
+				feedItem.Post.Images[i] = utils.BuildImgURL(feedItem.Post.Images[i])
+			}
+		}
+
+		result = append(result, feedItem)
 	}
 
-	return c.Status(200).JSON(fiber.Map{
-		"feedItems": feedItems,
-		"hasMore":   hasMore,
-		"nextSkip":  skip + limit,
-	})
+	return c.Status(200).JSON(result)
 }
 
 func UpdatePostCaption(c *fiber.Ctx) error {

@@ -27,7 +27,8 @@ type Post struct {
 	ID            primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
 	UserID        primitive.ObjectID `json:"userID,omitempty" bson:"userID"`
 	Caption       string             `json:"caption"`
-	Files         []string           `json:"images"`
+	Images        []string           `json:"images"`
+	Files         []string           `json:"files"`
 	Tags          []string           `json:"tags"`
 	LikesCount    uint32             `json:"likesCount" bson:"likesCount"`
 	CommentsCount uint32             `json:"commentsCount" bson:"commentsCount"`
