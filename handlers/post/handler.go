@@ -59,6 +59,9 @@ func CreatePost(c *fiber.Ctx) error {
 		}
 	}
 
+	post.CreatedAt = time.Now()
+	post.UpdatedAt = time.Now()
+
 	post.UserID = userID
 	collection = db.Database.Collection("posts")
 
@@ -67,65 +70,105 @@ func CreatePost(c *fiber.Ctx) error {
 		return utils.RespondWithError(c, 500, "Failed to create post "+err.Error())
 	}
 
-	fmt.Println(post)
-
 	return c.Status(201).JSON(fiber.Map{"post": post})
 }
 
 func GetPostsByUser(c *fiber.Ctx) error {
-	id := c.Params("_id")
+	id := c.Params("userID")
 	userID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid ID")
+	}
 
+	pageParam := c.Query("page", "1")
+
+	l := 10
+	p, _ := strconv.Atoi(pageParam)
+	skip := int64(p*l - l)
+
+	limit := int64(l)
+
+	var result []FeedItem
+
+	collection = db.Database.Collection("posts")
 	pipeline := mongo.Pipeline{
-		{{"$match", bson.D{{"userID", userID}}}},
-		{{"$lookup", bson.D{
+		bson.D{{"$match", bson.D{{"userID", userID}}}},
+		bson.D{{"$sort", bson.D{{"createdAt", -1}}}},
+
+		// Pagination
+		bson.D{{"$skip", skip}},
+		bson.D{{"$limit", limit}},
+
+		bson.D{{"$lookup", bson.D{
 			{"from", "users"},
 			{"localField", "userID"},
 			{"foreignField", "_id"},
 			{"as", "user"},
 		}}},
-		{{"$unwind", "$user"}},
-		{{"$project", bson.D{
-			{"post", "$$ROOT"},
-			{"user", 1},
+
+		bson.D{{"$unwind", bson.D{
+			{"path", "$user"},
+			{"preserveNullAndEmptyArrays", true},
 		}}},
-		{{"$project", bson.D{
-			{"user.password", 0},
-			{"user.email", 0},
+
+		bson.D{{"$project", bson.D{
+			{"post", "$$ROOT"},
+			{"userName", bson.D{{"$concat", bson.A{"$user.firstName", " ", "$user.lastName"}}}},
+
+			{"photoURL", "$user.photoURL"},
+			{"handle", "$user.handle"},
 		}}},
 	}
 
-	collection = db.Database.Collection("posts")
-	var posts []struct {
-		Post types.Post `json:"post" bson:"post"`
-		User types.User `json:"user" bson:"user"`
-	}
+	//pipeline := mongo.Pipeline{
+	//	bson.D{{"$match", bson.D{{"userID", userID}}}},
+	//	bson.D{{"$sort", bson.D{{"createdAt", -1}}}},
+	//	bson.D{{"$skip", skip}},
+	//	bson.D{{"$limit", limit}},
+	//	bson.D{{"$lookup", bson.D{
+	//		{"from", "users"},
+	//		{"localField", "userID"},
+	//		{"foreignField", "_id"},
+	//		{"as", "user"},
+	//	}}},
+	//	bson.D{{"$unwind", "$user"}},
+	//	bson.D{{"$project", bson.D{
+	//		{"post", "$$ROOT"},
+	//		{"user", 1},
+	//	}}},
+	//	bson.D{{"$project", bson.D{
+	//		{"userName", bson.D{{"$concat", bson.A{"$user.firstName", " ", "$user.lastName"}}}},
+	//		{"photoURL", "$user.photoURL"},
+	//		{"handle", "$user.handle"},
+	//	}}},
+	//}
 
 	cursor, err := collection.Aggregate(context.Background(), pipeline)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to get post" + err.Error()})
+		return utils.RespondWithError(c, 500, "Failed to fetch posts: "+err.Error())
 	}
-	defer cursor.Close(context.Background())
 
 	for cursor.Next(context.Background()) {
-		var res struct {
-			Post types.Post `json:"post" bson:"post"`
-			User types.User `json:"user" bson:"user"`
+		var post FeedItem
+
+		if err := cursor.Decode(&post); err != nil {
+			return utils.RespondWithError(c, 500, "Failed to decode post: "+err.Error())
 		}
 
-		if err = cursor.Decode(&res); err != nil {
-			return utils.RespondWithError(c, 500, "Failed to decode post data"+err.Error())
+		if post.PhotoURL != "" {
+			post.PhotoURL = utils.BuildImgURL(post.PhotoURL)
+		}
+		if post.Post.Images != nil {
+			for i := range post.Post.Images {
+				post.Post.Images[i] = utils.BuildImgURL(post.Post.Images[i])
+			}
 		}
 
-		posts = append(posts, res)
+		result = append(result, post)
 
 	}
 
-	if err := cursor.Err(); err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Cursor iteration error: " + err.Error()})
-	}
-
-	return c.Status(200).JSON(fiber.Map{"posts": posts})
+	return c.Status(200).JSON(result)
 }
 
 func DeletePost(c *fiber.Ctx) error {
@@ -188,8 +231,6 @@ func GetFeedPosts(c *fiber.Ctx) error {
 	skip := int64(p*l - l)
 
 	limit := int64(l)
-
-	//opt := options.FindOptions{Limit: &limit, Skip: &skip}
 
 	pipeline := mongo.Pipeline{
 
@@ -270,7 +311,7 @@ func UpdatePostCaption(c *fiber.Ctx) error {
 
 	collection := db.Database.Collection("posts")
 	filter := bson.M{"_id": objectID}
-	update := bson.M{"$set": bson.M{"caption": body.Caption}}
+	update := bson.M{"$set": bson.M{"caption": body.Caption}, "$currentDate": bson.M{"updatedAt": true}}
 
 	_, err = collection.UpdateOne(context.Background(), filter, update)
 	if err != nil {
