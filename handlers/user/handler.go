@@ -4,8 +4,8 @@ import (
 	"context"
 	"github.com/edisss1/fiabesco-backend/db"
 	"github.com/edisss1/fiabesco-backend/handlers/auth"
+	"github.com/edisss1/fiabesco-backend/handlers/uploads"
 	"github.com/edisss1/fiabesco-backend/types"
-	"github.com/edisss1/fiabesco-backend/uploads"
 	"github.com/edisss1/fiabesco-backend/utils"
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"
@@ -52,11 +52,12 @@ func GetUserData(c *fiber.Ctx) error {
 	var user MeRes
 
 	collection = db.Database.Collection("users")
-	filter := bson.M{"email": claims.Email}
+	userID, err := primitive.ObjectIDFromHex(claims.ID)
+	filter := bson.M{"_id": userID}
 
 	err = collection.FindOne(context.Background(), filter).Decode(&user)
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Invalid credentials"})
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid credentials " + err.Error()})
 	}
 
 	if user.PhotoURL != "" {

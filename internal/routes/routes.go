@@ -5,12 +5,12 @@ import (
 	"github.com/edisss1/fiabesco-backend/handlers/messages"
 	"github.com/edisss1/fiabesco-backend/handlers/portfolio"
 	"github.com/edisss1/fiabesco-backend/handlers/post"
+	"github.com/edisss1/fiabesco-backend/handlers/settings"
+	"github.com/edisss1/fiabesco-backend/handlers/social"
+	"github.com/edisss1/fiabesco-backend/handlers/uploads"
 	"github.com/edisss1/fiabesco-backend/handlers/user"
 	"github.com/edisss1/fiabesco-backend/limiters"
 	"github.com/edisss1/fiabesco-backend/middleware"
-	"github.com/edisss1/fiabesco-backend/settings"
-	"github.com/edisss1/fiabesco-backend/social"
-	"github.com/edisss1/fiabesco-backend/uploads"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -59,6 +59,7 @@ func postRoutes(app *fiber.App) {
 	posts.Post("/:postID/comment", post.CommentPost)
 	posts.Get("/:postID/comments", post.GetComments)
 	posts.Patch("/:commentID/edit", post.EditComment)
+	posts.Delete("/:commentID", post.DeleteComment)
 }
 
 func messageRoutes(app *fiber.App) {

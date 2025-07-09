@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"github.com/gofiber/fiber/v2"
+	"github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"math/rand"
 	"reflect"
@@ -75,4 +76,25 @@ func DiffStructs(prefix string, oldVal, newVal reflect.Value, changes map[string
 
 func BuildImgURL(imageID string) string {
 	return fmt.Sprintf("%s/%s", baseImgURL, imageID)
+}
+
+func VerifyOwnership(c *fiber.Ctx, ownerID primitive.ObjectID) (bool, error) {
+	user := c.Locals("jwt").(*jwt.Token)
+
+	claims := user.Claims.(jwt.MapClaims)
+	userID, err := ParseHexID(claims["id"].(string))
+	if err != nil {
+		return false, err
+	}
+
+	fmt.Printf("Claims: %s\n", claims)
+	fmt.Printf("Owner ID: %s\n", ownerID)
+	fmt.Printf("User ID: %s\n", userID)
+
+	if userID != ownerID {
+		return false, nil
+	}
+
+	return true, nil
+
 }

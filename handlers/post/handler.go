@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/edisss1/fiabesco-backend/db"
+	"github.com/edisss1/fiabesco-backend/handlers/uploads"
 	"github.com/edisss1/fiabesco-backend/types"
-	"github.com/edisss1/fiabesco-backend/uploads"
 	"github.com/edisss1/fiabesco-backend/utils"
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"
@@ -552,4 +552,48 @@ func EditComment(c *fiber.Ctx) error {
 	}
 
 	return c.Status(200).JSON(fiber.Map{"msg": "Comment updated successfully"})
+}
+
+func DeleteComment(c *fiber.Ctx) error {
+	id := c.Params("commentID")
+	commentID, err := utils.ParseHexID(id)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid ID")
+	}
+
+	collection := db.Database.Collection("comments")
+	filter := bson.M{"_id": commentID}
+
+	var comment types.Comment
+
+	err = collection.FindOne(context.Background(), filter).Decode(&comment)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Error decoding comment "+err.Error())
+	}
+
+	isOwner, err := utils.VerifyOwnership(c, comment.UserID)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Error verifying ownership "+err.Error())
+	}
+
+	if !isOwner {
+		return utils.RespondWithError(c, 401, "Unauthorized")
+	}
+
+	collection = db.Database.Collection("posts")
+	filter = bson.M{"_id": comment.PostID}
+	update := bson.M{"$inc": bson.M{"commentsCount": -1}}
+
+	_, err = collection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Error updating post "+err.Error())
+	}
+
+	_, err = collection.DeleteOne(context.Background(), filter)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Error deleting post "+err.Error())
+	}
+
+	return c.Status(200).JSON(fiber.Map{"msg": "Comment deleted successfully"})
+
 }

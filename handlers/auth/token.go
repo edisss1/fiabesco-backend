@@ -10,12 +10,12 @@ import (
 )
 
 type Claims struct {
-	Email string `json:"email"`
+	ID string `json:"id"`
 	jwt.RegisteredClaims
 }
 
-func GenerateToken(email string) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"email": email})
+func GenerateToken(userID string) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"id": userID})
 
 	t, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
 	if err != nil {
