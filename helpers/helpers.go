@@ -116,46 +116,60 @@ func GetConversations(userID primitive.ObjectID) ([]types.Conversation, error) {
 
 }
 
-func SaveSettings(c *fiber.Ctx) error {
-	id := c.Params("userID")
-	userID, err := utils.ParseHexID(id)
+func SaveSetting(c *fiber.Ctx, setting map[string]interface{}) error {
+	userID, err := utils.GetUserID(c)
 	if err != nil {
 		return utils.RespondWithError(c, 400, "Invalid user ID")
 	}
 
-	var body types.Settings
+	collection := db.Database.Collection("settings")
 
-	if err := c.BodyParser(&body); err != nil {
-		return utils.RespondWithError(c, 400, "Invalid request body")
+	allowedFields := map[string]bool{
+		"theme":             true,
+		"language":          true,
+		"profileVisibility": true,
 	}
 
-	collection := db.Database.Collection("users")
-
-	var user types.User
-	filter := bson.M{"_id": userID}
-
-	if err := collection.FindOne(context.Background(), filter).Decode(&user); err != nil {
-		return utils.RespondWithError(c, 404, "User not found")
-	}
-
-	if body.Theme != "" {
-		_, err = collection.UpdateOne(context.Background(), filter, bson.M{"$set": bson.M{"settings.theme": body.Theme}})
-
-		if err != nil {
-			return utils.RespondWithError(c, 500, "Failed to update user settings")
-		}
-
-	}
-
-	if body.Language != "" {
-
-		_, err = collection.UpdateOne(context.Background(), filter, bson.M{"$set": bson.M{"settings.language": body.Language}})
-
-		if err != nil {
-			return utils.RespondWithError(c, 500, "Failed to update user settings")
+	for key := range setting {
+		allowed, exists := allowedFields[key]
+		if !exists || !allowed {
+			return utils.RespondWithError(c, 400, "Invalid field: "+key)
 		}
 	}
 
-	return c.Status(200).JSON(fiber.Map{"msg": "Settings saved successfully"})
+	filter := bson.M{"userID": userID}
+	update := bson.M{
+		"$set": setting,
+	}
 
+	defaultSettings := types.Settings{
+		UserID:            userID,
+		Theme:             "light",
+		Language:          "en",
+		ProfileVisibility: "public",
+	}
+
+	count, err := collection.CountDocuments(context.Background(), filter)
+
+	if err != nil {
+		return utils.RespondWithError(c, 500, "Error checking document count")
+	}
+
+	if count == 0 {
+		_, err = collection.InsertOne(context.Background(), defaultSettings)
+		if err != nil {
+			return utils.RespondWithError(c, 500, "Error inserting default settings")
+		}
+		_, err = collection.UpdateOne(context.Background(), filter, update)
+		if err != nil {
+			return utils.RespondWithError(c, 500, "Error updating settings")
+		}
+	} else {
+		_, err = collection.UpdateOne(context.Background(), filter, update)
+		if err != nil {
+			return utils.RespondWithError(c, 500, "Error updating settings")
+		}
+	}
+
+	return c.Status(200).JSON(fiber.Map{"message": "Settings updated successfully"})
 }

@@ -85,8 +85,11 @@ type Comment struct {
 }
 
 type Settings struct {
-	Theme    string `json:"theme" bson:"theme"`
-	Language string `json:"language"`
+	ID                primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
+	UserID            primitive.ObjectID `json:"userID" bson:"userID"`
+	Theme             string             `json:"theme" bson:"theme"`
+	Language          string             `json:"language"`
+	ProfileVisibility string             `json:"profileVisibility" bson:"profileVisibility"`
 }
 
 type Follow struct {

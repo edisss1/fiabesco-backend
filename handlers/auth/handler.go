@@ -7,6 +7,7 @@ import (
 	"github.com/edisss1/fiabesco-backend/utils"
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"time"
 )
@@ -38,7 +39,21 @@ func SignUp(c *fiber.Ctx) error {
 	input.Handle = handle
 	input.CreatedAt = time.Now()
 
-	_, err = collection.InsertOne(context.Background(), input)
+	res, err := collection.InsertOne(context.Background(), input)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "DB error"})
+	}
+
+	collection = db.Database.Collection("settings")
+
+	settings := types.Settings{
+		UserID:            res.InsertedID.(primitive.ObjectID),
+		Theme:             "light",
+		Language:          "en",
+		ProfileVisibility: "public",
+	}
+
+	_, err = collection.InsertOne(context.Background(), settings)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "DB error"})
 	}

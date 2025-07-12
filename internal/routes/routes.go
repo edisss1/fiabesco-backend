@@ -5,7 +5,7 @@ import (
 	"github.com/edisss1/fiabesco-backend/handlers/messages"
 	"github.com/edisss1/fiabesco-backend/handlers/portfolio"
 	"github.com/edisss1/fiabesco-backend/handlers/post"
-	settings "github.com/edisss1/fiabesco-backend/handlers/settings/general-settings"
+	"github.com/edisss1/fiabesco-backend/handlers/settings"
 	"github.com/edisss1/fiabesco-backend/handlers/social"
 	"github.com/edisss1/fiabesco-backend/handlers/uploads"
 	"github.com/edisss1/fiabesco-backend/handlers/user"
@@ -78,12 +78,15 @@ func messageRoutes(app *fiber.App) {
 func settingsRoutes(app *fiber.App) {
 	setting := app.Group("/settings", middleware.RequireJWT)
 
-	setting.Put("/theme", settings.ChangeFirstName)
-	setting.Put("/language", settings.ChangeLastName)
+	setting.Put("/firstname", settings.ChangeFirstName)
+	setting.Put("/lastname", settings.ChangeLastName)
 	setting.Put("/email", settings.ChangeEmail)
 	setting.Put("/handle", settings.ChangeHandle)
 	setting.Put("/password", settings.ChangePassword)
-
+	setting.Put("/theme", settings.ChangeTheme)
+	setting.Put("/language", settings.ChangeLanguage)
+	setting.Put("/visibility", settings.ChangeProfileVisibility)
+	setting.Get("/data", settings.DownloadUserData)
 }
 
 func portfolioRoutes(app *fiber.App) {
