@@ -1,78 +1,34 @@
-Fiabesco is a backend service for a social media platform. It allows users to interact with each other through posts, comments, and likes. The backend is built using **Go** and **GoFiber**, with **MongoDB** as the database.
+# 🛠️ Fiabesco Backend – API for Artist Social Media Platform
 
-## Features
+This is the backend API for **Fiabesco**, a social media platform for artists. Built with performance and simplicity in mind using **Go**, **Fiber**, and **MongoDB**.
 
--   User registration and authentication
-    
--   Post creation
-    
--   Comment and like systems for posts
- 
--   MongoDB for data storage
-    
+> This repository powers the backend logic for user authentication, content management, and interaction features of the Fiabesco app.
 
-    
+---
 
-## Installation
+## 🧪 Tech Stack
 
-### Prerequisites
+- **Go** – Statically typed, compiled language for high performance  
+- **Fiber** – Express-inspired web framework for Go  
+- **MongoDB** – NoSQL database, ideal for flexible document-based data  
 
--   [Go 1.23+](https://golang.org/dl/)
-    
--   [MongoDB](https://www.mongodb.com/try/download/community)
-    
+---
 
-### Clone the repository
+## 🗂️ Features
 
-```bash
-git clone https://github.com/edisss1/fiabesco-backend.git
-cd fiabesco-backend
-```
-
-
-
-### Install dependencies
-
-Run the following command to install the required Go dependencies:
-
-
-
-```bash 
-go mod tidy
-```
-
-
-
-### Set up environment variables
-
-Create a `.env` file in the root directory of the project and set the following environment variables:
+- 🔐 **Authentication**
+  - Register/Login with secure password hashing
+  - JWT token-based session management
+- 👤 **User Management**
+  - Profile updates
+  - Soft account deletion with restoration
+- 🖼️ **Posts & Comments**
+  - Create, edit, and delete artworks
+  - Add and reply to comments
+- ❤️ **Likes & Saves**
+  - Like/unlike posts
+  - Save artworks to personal collections
 
 
 
 
-
-`MONGO_URI=mongodb+srv://<db_user>:<db_password>@cluster0.ez6e1rn.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0` 
-`PORT=3000`
-
--   `MONGO_URI` should be your MongoDB connection string.
-    
--   `PORT` is the port on which the backend will run.
-    
-
-### Run the project
-
-To start the server, use the following command:
-
-
-
-
-
-`go run cmd/main.go` 
-
-Or add this to Makefile
-```Makefile
-run:
-	go run cmd/main.go
-```
-
-The backend will be running on `http://localhost:3000`.
