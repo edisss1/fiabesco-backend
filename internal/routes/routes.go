@@ -5,11 +5,10 @@ import (
 	"github.com/edisss1/fiabesco-backend/handlers/messages"
 	"github.com/edisss1/fiabesco-backend/handlers/portfolio"
 	"github.com/edisss1/fiabesco-backend/handlers/post"
-	"github.com/edisss1/fiabesco-backend/handlers/settings"
+	settings "github.com/edisss1/fiabesco-backend/handlers/settings/general-settings"
 	"github.com/edisss1/fiabesco-backend/handlers/social"
 	"github.com/edisss1/fiabesco-backend/handlers/uploads"
 	"github.com/edisss1/fiabesco-backend/handlers/user"
-	"github.com/edisss1/fiabesco-backend/limiters"
 	"github.com/edisss1/fiabesco-backend/middleware"
 	"github.com/gofiber/fiber/v2"
 )
@@ -77,9 +76,13 @@ func messageRoutes(app *fiber.App) {
 }
 
 func settingsRoutes(app *fiber.App) {
-	users := app.Group("/users", middleware.RequireJWT, limiters.SettingsLimiter())
+	setting := app.Group("/settings", middleware.RequireJWT)
 
-	users.Put("/:userID/settings", settings.SaveSettings)
+	setting.Put("/theme", settings.ChangeFirstName)
+	setting.Put("/language", settings.ChangeLastName)
+	setting.Put("/email", settings.ChangeEmail)
+	setting.Put("/handle", settings.ChangeHandle)
+	setting.Put("/password", settings.ChangePassword)
 
 }
 
