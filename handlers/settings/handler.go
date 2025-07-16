@@ -29,7 +29,7 @@ func ChangeFirstName(c *fiber.Ctx) error {
 	}
 
 	filter := bson.M{"_id": userID}
-	update := bson.M{"firstName": body.FirstName}
+	update := bson.M{"$set": bson.M{"firstName": body.FirstName}}
 
 	collection = db.Database.Collection("users")
 
@@ -56,7 +56,7 @@ func ChangeLastName(c *fiber.Ctx) error {
 	}
 
 	filter := bson.M{"_id": userID}
-	update := bson.M{"lastName": body.LastName}
+	update := bson.M{"$set": bson.M{"lastName": body.LastName}}
 
 	collection = db.Database.Collection("users")
 
@@ -83,7 +83,7 @@ func ChangeEmail(c *fiber.Ctx) error {
 	}
 
 	filter := bson.M{"_id": userID}
-	update := bson.M{"email": body.Email}
+	update := bson.M{"$set": bson.M{"email": body.Email}}
 
 	collection = db.Database.Collection("users")
 
@@ -110,7 +110,7 @@ func ChangeHandle(c *fiber.Ctx) error {
 	}
 
 	filter := bson.M{"_id": userID}
-	update := bson.M{"handle": body.Handle}
+	update := bson.M{"$set": bson.M{"handle": body.Handle}}
 
 	collection = db.Database.Collection("users")
 
