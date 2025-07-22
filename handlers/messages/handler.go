@@ -11,7 +11,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 	"slices"
 	"strings"
@@ -47,12 +46,14 @@ func StartConversation(c *fiber.Ctx) error {
 	var sender struct {
 		FirstName    string               `json:"firstName"`
 		LastName     string               `json:"lastName"`
+		PhotoURL     string               `json:"photoURL" bson:"photoURL"`
 		BlockedUsers []primitive.ObjectID `json:"blockedUsers" bson:"blockedUsers"`
 	}
 	var recipient struct {
 		FirstName    string               `json:"firstName"`
 		LastName     string               `json:"lastName"`
-		BlockedUsers []primitive.ObjectID `json:"blockedUsers"bson:"blockedUsers"`
+		PhotoURL     string               `json:"photoURL" bson:"photoURL"`
+		BlockedUsers []primitive.ObjectID `json:"blockedUsers" bson:"blockedUsers"`
 	}
 
 	senderFilter := bson.M{"_id": senderID}
@@ -92,15 +93,14 @@ func StartConversation(c *fiber.Ctx) error {
 		return utils.RespondWithError(c, 500, "DB error")
 	}
 
-	senderFullName := strings.TrimSpace(sender.FirstName + " " + sender.LastName)
-	recipientFullName := strings.TrimSpace(recipient.FirstName + " " + recipient.LastName)
-
 	newConversation := types.Conversation{
-		IsGroup:      false,
-		Participants: []primitive.ObjectID{senderID, recipientID},
-		Names:        []string{senderFullName, recipientFullName},
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		IsGroup:   false,
+		CreatedAt: time.Now(),
+		ParticipantsIds: []primitive.ObjectID{
+			senderID,
+			recipientID,
+		},
+		UpdatedAt: time.Now(),
 	}
 
 	result, err := conversationsCollection.InsertOne(context.Background(), newConversation)
@@ -232,39 +232,75 @@ func EditMessage(c *fiber.Ctx) error {
 func GetConversation(c *fiber.Ctx) error {
 	conversationsCollection = db.Database.Collection("conversations")
 	messagesCollection = db.Database.Collection("messages")
+	usersCollection = db.Database.Collection("users")
 	id := c.Params("conversationID")
 	conversationID, err := utils.ParseHexID(id)
 	if err != nil {
 		return utils.RespondWithError(c, 400, "Invalid ID")
 	}
+
+	filter := bson.M{"_id": conversationID}
 	var conversation types.Conversation
-
-	err = conversationsCollection.FindOne(context.Background(), bson.M{"_id": conversationID}).Decode(&conversation)
+	err = conversationsCollection.FindOne(context.Background(), filter).Decode(&conversation)
 	if err != nil {
-		return utils.RespondWithError(c, 404, "Conversation not found")
+		return utils.RespondWithError(c, 404, "Conversation not found "+err.Error())
 	}
 
-	filter := bson.M{"conversationID": conversationID}
-	opts := options.Find().SetSort(bson.D{{"createdAt", -1}})
-
-	cursor, err := messagesCollection.Find(context.Background(), filter, opts)
-	if err != nil {
-		return utils.RespondWithError(c, 500, "Couldn't get messages")
-	}
 	var messages []types.Message
-	if err := cursor.All(context.Background(), &messages); err != nil {
-		return utils.RespondWithError(c, 500, "Error decoding messages")
+	messagesFilter := bson.M{"conversationID": conversationID}
+	cursor, err := messagesCollection.Find(context.Background(), messagesFilter)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "DB error "+err.Error())
 	}
+
+	for cursor.Next(context.Background()) {
+		var message types.Message
+		err := cursor.Decode(&message)
+		if err != nil {
+			return utils.RespondWithError(c, 500, "DB error "+err.Error())
+		}
+		messages = append(messages, message)
+	}
+
+	usersFilter := bson.M{"_id": bson.M{"$in": conversation.ParticipantsIds}}
+	cursor, err = usersCollection.Find(context.Background(), usersFilter)
+	if err != nil {
+		return utils.RespondWithError(c, 500, "DB error "+err.Error())
+	}
+	var enriched []types.Participant
+
+	for cursor.Next(context.Background()) {
+		var user struct {
+			ID        primitive.ObjectID `bson:"_id"`
+			FirstName string             `bson:"firstName"`
+			LastName  string             `bson:"lastName"`
+			Photo     string             `bson:"photoURL"`
+		}
+		_ = cursor.Decode(&user)
+
+		if user.Photo != "" {
+			user.Photo = utils.BuildImgURL(user.Photo)
+		} else {
+			user.Photo = ""
+		}
+
+		enriched = append(enriched, types.Participant{
+			ID:       user.ID,
+			UserName: strings.TrimSpace(user.FirstName + " " + user.LastName),
+			PhotoURL: user.Photo,
+		})
+	}
+
+	conversation.Participants = enriched
 
 	return c.Status(200).JSON(fiber.Map{"conversation": conversation, "messages": messages})
+
 }
 
 func GetConversations(c *fiber.Ctx) error {
-	id := c.Params("userID")
-	userID, err := utils.ParseHexID(id)
-
+	userID, err := utils.GetUserID(c)
 	if err != nil {
-		return utils.RespondWithError(c, 400, "Invalid ID")
+		return utils.RespondWithError(c, 400, "Invalid user ID")
 	}
 
 	conversations, err := helpers.GetConversations(userID)

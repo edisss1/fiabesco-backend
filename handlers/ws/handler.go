@@ -2,6 +2,7 @@ package ws
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/edisss1/fiabesco-backend/helpers"
 	"github.com/edisss1/fiabesco-backend/types"
 	"github.com/edisss1/fiabesco-backend/utils"
@@ -33,25 +34,27 @@ type EditMessagePayload struct {
 	SenderID       string `json:"senderID"`
 }
 
+type UpdateStatusPayload struct {
+	UserID string `json:"userID"`
+	Status string `json:"status"`
+}
+
 type GetConversationsPayload struct {
 	UserID string `json:"userID"`
 }
 
 func HandleWS(conn *websocket.Conn) {
 	userID := conn.Query("userID")
-	log.Printf("New connection from userID: %s\n", userID)
 
 	mu.Lock()
 	clients[userID] = conn
 	mu.Unlock()
-	log.Printf("Added user %s to clients map\n", userID)
 
 	defer func() {
 		mu.Lock()
 		delete(clients, userID)
 		mu.Unlock()
 		conn.Close()
-		log.Printf("Closed connection for userID: %s\n", userID)
 	}()
 
 	for {
@@ -61,8 +64,6 @@ func HandleWS(conn *websocket.Conn) {
 			break
 		}
 
-		log.Printf("Received message: %v\n", base)
-
 		switch base.Type {
 		case "send_message":
 			var payload SendMessagePayload
@@ -70,8 +71,6 @@ func HandleWS(conn *websocket.Conn) {
 				log.Println("Unmarshal error: ", err)
 				continue
 			}
-
-			log.Printf("Received send_message payload: %+v\n", payload)
 
 			senderID, err := primitive.ObjectIDFromHex(payload.SenderID)
 			if err != nil {
@@ -89,15 +88,18 @@ func HandleWS(conn *websocket.Conn) {
 				log.Println("Error saving message: ", err)
 				continue
 			}
-			log.Printf("Saved message: %+v\n", message)
 
 			conversation, err := helpers.GetConversation(conversationID)
 			if err != nil {
 				log.Println("Error getting conversation: ", err)
 			}
 
-			for _, userID := range conversation.Participants {
-				conn, ok := clients[userID.Hex()]
+			fmt.Println(clients)
+			fmt.Println("Participants: ", conversation.Participants)
+
+			for _, user := range conversation.Participants {
+				fmt.Println("user: ", user)
+				conn, ok := clients[user.ID.Hex()]
 				if ok {
 					err = conn.WriteJSON(struct {
 						Type    string        `json:"type"`
@@ -106,7 +108,6 @@ func HandleWS(conn *websocket.Conn) {
 						Type:    "conversations_update",
 						Message: message,
 					})
-					log.Printf("Sent message to participant: %v\n", message)
 				}
 			}
 
@@ -133,26 +134,21 @@ func HandleWS(conn *websocket.Conn) {
 			}
 
 			message, err := helpers.SaveEditedMessage(messageID, payload.Content, conversationID, senderID)
-			log.Println("Saved message: ", message)
 
-			log.Printf("Edited message: ID: %s, ConversationID: %s, SenderID: %s, Content: %s, CreatedAt: %v, UpdatedAt: %v\n",
-				message.ID, message.ConversationID, message.SenderID, message.Content, message.CreatedAt, message.UpdatedAt)
 			if err != nil {
 				log.Println("Error saving message: ", err)
 				continue
 			}
 
-			log.Println("ConversationID: ", message.ConversationID)
 			conversation, err := helpers.GetConversation(message.ConversationID)
 			if err != nil {
 				log.Println("Error getting conversation: ", err)
 			}
 
-			for _, userID := range conversation.Participants {
+			for _, user := range conversation.Participants {
 
-				if conn, ok := clients[userID.Hex()]; ok {
+				if conn, ok := clients[user.ID.Hex()]; ok {
 					err = conn.WriteJSON(message)
-					log.Printf("Sent message to user: %v\n", message)
 					if err != nil {
 						log.Println("Error sending message to user: ", err)
 					}
@@ -186,12 +182,27 @@ func HandleWS(conn *websocket.Conn) {
 					Type:          "conversations",
 					Conversations: conversations,
 				})
-				log.Printf("Sent conversations to user: %v\n", conversations)
 				if err != nil {
 					log.Println("Error sending conversations to user: ", err)
 				}
 			}
+		case "update_status":
+			var payload UpdateStatusPayload
+			if err := json.Unmarshal(base.Data, &payload); err != nil {
+				log.Println("Unmarshal error: ", err)
+				continue
+			}
+			userID, err := utils.ParseHexID(payload.UserID)
+			if err != nil {
+				log.Println("Invalid userID: ", err)
+				continue
+			}
 
+			err = helpers.UpdateUserStatus(userID, payload.Status)
+			if err != nil {
+				log.Println("Error updating user status: ", err)
+				continue
+			}
 		default:
 			log.Printf("Unknown message type: %s\n", base.Type)
 

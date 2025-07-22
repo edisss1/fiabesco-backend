@@ -21,6 +21,8 @@ type User struct {
 	FollowedUsers  []string           `json:"followedUsers" bson:"followedUsers"`
 	CreatedAt      time.Time          `json:"createdAt" bson:"createdAt"`
 	Settings       *Settings          `json:"settings" bson:"settings"`
+	IsOnline       bool               `json:"isOnline" bson:"isOnline"`
+	LastSeen       time.Time          `json:"lastSeen" bson:"lastSeen"`
 }
 
 type Post struct {
@@ -50,15 +52,22 @@ type Message struct {
 	IsEdited       bool               `json:"isEdited" bson:"isEdited"`
 }
 
+type Participant struct {
+	ID       primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
+	UserName string             `json:"userName" bson:"userName"`
+	PhotoURL string             `json:"photoURL" bson:"photoURL"`
+	IsOnline bool               `json:"isOnline" bson:"isOnline"`
+	LastSeen time.Time          `json:"lastSeen" bson:"lastSeen"`
+}
 type Conversation struct {
-	ID           primitive.ObjectID   `json:"_id,omitempty" bson:"_id,omitempty"`
-	Participants []primitive.ObjectID `json:"participants" bson:"participants"`
-	Names        []string             `json:"names"`
-	IsGroup      bool                 `json:"isGroup" bson:"isGroup"`
-	Name         string               `json:"name"`
-	LastMessage  Message              `json:"lastMessage" bson:"lastMessage"`
-	CreatedAt    time.Time            `json:"createdAt" bson:"createdAt"`
-	UpdatedAt    time.Time            `json:"updatedAt" bson:"updatedAt"`
+	ID              primitive.ObjectID   `json:"_id,omitempty" bson:"_id,omitempty"`
+	ParticipantsIds []primitive.ObjectID `json:"participantsIds" bson:"participantsIds"`
+	Participants    []Participant        `json:"participants" bson:"-"`
+	IsGroup         bool                 `json:"isGroup" bson:"isGroup"`
+	Name            string               `json:"name"`
+	LastMessage     Message              `json:"lastMessage" bson:"lastMessage"`
+	CreatedAt       time.Time            `json:"createdAt" bson:"createdAt"`
+	UpdatedAt       time.Time            `json:"updatedAt" bson:"updatedAt"`
 }
 
 type Repost struct {

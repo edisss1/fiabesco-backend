@@ -68,8 +68,8 @@ func messageRoutes(app *fiber.App) {
 	conversations.Post("/start", messages.StartConversation)
 	conversations.Post("/:conversationID/messages/:senderID", messages.SendMessage)
 	conversations.Delete("/:conversationID", messages.DeleteConversation)
-	conversations.Get("/:conversationID", messages.GetConversation)
-	conversations.Get("/:userID", messages.GetConversations)
+	conversations.Get("/conversation/:conversationID", messages.GetConversation)
+	conversations.Get("/all", messages.GetConversations)
 	message.Patch("/:_id", messages.EditMessage)
 	message.Delete("/delete", messages.DeleteMessage)
 

@@ -10,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -85,6 +86,7 @@ func SaveEditedMessage(messageID primitive.ObjectID, content string, conversatio
 
 func GetConversation(conversationID primitive.ObjectID) (types.Conversation, error) {
 	conversationsCollection := db.Database.Collection("conversations")
+	usersCollection := db.Database.Collection("users")
 
 	filter := bson.M{"_id": conversationID}
 	var conversation types.Conversation
@@ -93,27 +95,88 @@ func GetConversation(conversationID primitive.ObjectID) (types.Conversation, err
 		return types.Conversation{}, err
 	}
 
+	filter = bson.M{"_id": bson.M{"$in": conversation.ParticipantsIds}}
+	cursor, err := usersCollection.Find(context.Background(), filter)
+	if err != nil {
+		return types.Conversation{}, err
+	}
+	var participants []types.Participant
+	if err := cursor.All(context.Background(), &participants); err != nil {
+		return types.Conversation{}, err
+	}
+	conversation.Participants = participants
+
 	return conversation, nil
 }
 
 func GetConversations(userID primitive.ObjectID) ([]types.Conversation, error) {
 	conversationsCollection := db.Database.Collection("conversations")
+	usersCollection := db.Database.Collection("users")
 
-	filter := bson.M{"participants": userID}
-	var conversatinos []types.Conversation
-
+	filter := bson.M{"participantsIds": userID}
 	cursor, err := conversationsCollection.Find(context.Background(), filter)
 	if err != nil {
-		return []types.Conversation{}, err
+		return nil, err
 	}
 
-	err = cursor.All(context.Background(), &conversatinos)
+	var conversations []types.Conversation
+	if err := cursor.All(context.Background(), &conversations); err != nil {
+		return nil, err
+	}
+
+	participantIDSet := make(map[primitive.ObjectID]struct{})
+	for _, conv := range conversations {
+		for _, id := range conv.ParticipantsIds {
+			participantIDSet[id] = struct{}{}
+		}
+	}
+	var participantIDs []primitive.ObjectID
+	for id := range participantIDSet {
+		participantIDs = append(participantIDs, id)
+	}
+
+	usersFilter := bson.M{"_id": bson.M{"$in": participantIDs}}
+	cursor, err = usersCollection.Find(context.Background(), usersFilter)
 	if err != nil {
-		return []types.Conversation{}, err
+		return nil, err
 	}
 
-	return conversatinos, nil
+	userMap := make(map[primitive.ObjectID]types.Participant)
+	for cursor.Next(context.Background()) {
+		var user struct {
+			ID        primitive.ObjectID `bson:"_id"`
+			FirstName string             `bson:"firstName"`
+			LastName  string             `bson:"lastName"`
+			Photo     string             `bson:"photoURL"`
+		}
+		if err := cursor.Decode(&user); err != nil {
+			continue
+		}
 
+		if user.Photo != "" {
+			user.Photo = utils.BuildImgURL(user.Photo)
+		} else {
+			user.Photo = ""
+		}
+
+		userMap[user.ID] = types.Participant{
+			ID:       user.ID,
+			UserName: strings.TrimSpace(user.FirstName + " " + user.LastName),
+			PhotoURL: user.Photo,
+		}
+	}
+
+	for i, conv := range conversations {
+		var enriched []types.Participant
+		for _, id := range conv.ParticipantsIds {
+			if participant, ok := userMap[id]; ok {
+				enriched = append(enriched, participant)
+			}
+		}
+		conversations[i].Participants = enriched
+	}
+
+	return conversations, nil
 }
 
 func SaveSetting(c *fiber.Ctx, setting map[string]interface{}) error {
@@ -172,4 +235,22 @@ func SaveSetting(c *fiber.Ctx, setting map[string]interface{}) error {
 	}
 
 	return c.Status(200).JSON(fiber.Map{"message": "Settings updated successfully"})
+}
+
+func UpdateUserStatus(userID primitive.ObjectID, status string) error {
+	collection := db.Database.Collection("users")
+
+	filter := bson.M{"_id": userID}
+	update := bson.M{"$set": bson.M{
+		"status":   status,
+		"lastSeen": time.Now(),
+	}}
+
+	_, err := collection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
 }
