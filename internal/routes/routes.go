@@ -2,6 +2,7 @@ package routes
 
 import (
 	"github.com/edisss1/fiabesco-backend/handlers/auth"
+	"github.com/edisss1/fiabesco-backend/handlers/mail"
 	"github.com/edisss1/fiabesco-backend/handlers/messages"
 	"github.com/edisss1/fiabesco-backend/handlers/portfolio"
 	"github.com/edisss1/fiabesco-backend/handlers/post"
@@ -21,6 +22,7 @@ func Setup(app *fiber.App) {
 	settingsRoutes(app)
 	portfolioRoutes(app)
 	servingRoutes(app)
+	emailRoutes(app)
 }
 
 func authRoutes(app *fiber.App) {
@@ -100,4 +102,9 @@ func servingRoutes(app *fiber.App) {
 	images := app.Group("/images")
 
 	images.Get("/:imageID", uploads.ServeImage)
+}
+
+func emailRoutes(app *fiber.App) {
+	emails := app.Group("/emails", middleware.RequireJWT)
+	emails.Post("/send", mail.SendEmail)
 }
