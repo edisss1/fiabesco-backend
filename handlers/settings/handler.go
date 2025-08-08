@@ -109,7 +109,15 @@ func ChangeHandle(c *fiber.Ctx) error {
 		return utils.RespondWithError(c, 400, "Invalid request body")
 	}
 
-	filter := bson.M{"_id": userID}
+	filter := bson.M{"handle": body.Handle}
+
+	collection = db.Database.Collection("users")
+
+	if err := collection.FindOne(context.Background(), filter).Err(); err == nil {
+		return utils.RespondWithError(c, 400, "Handle already exists")
+	}
+
+	filter = bson.M{"_id": userID}
 	update := bson.M{"$set": bson.M{"handle": body.Handle}}
 
 	collection = db.Database.Collection("users")
