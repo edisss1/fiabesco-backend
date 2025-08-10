@@ -4,13 +4,19 @@ import (
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"math/rand"
 )
 
 var baseImgURL = "http://localhost:3000/images"
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+type PipelineBuilder struct {
+	stages mongo.Pipeline
+}
 
 func GenerateHandle(l int) string {
 
@@ -63,4 +69,57 @@ func GetUserID(c *fiber.Ctx) (primitive.ObjectID, error) {
 	}
 
 	return userID, nil
+}
+
+func NewPipeline() *PipelineBuilder {
+	return &PipelineBuilder{stages: mongo.Pipeline{}}
+}
+
+func (pb *PipelineBuilder) Sort(field string, order int) *PipelineBuilder {
+	pb.stages = append(pb.stages, bson.D{{"$sort", bson.D{{field, order}}}})
+	return pb
+}
+
+func (pb *PipelineBuilder) Match(field bson.D) *PipelineBuilder {
+	pb.stages = append(pb.stages, bson.D{{"$match", field}})
+	return pb
+}
+
+func (pb *PipelineBuilder) Skip(n int64) *PipelineBuilder {
+	pb.stages = append(pb.stages, bson.D{{"$skip", n}})
+	return pb
+}
+
+func (pb *PipelineBuilder) Limit(n int64) *PipelineBuilder {
+	pb.stages = append(pb.stages, bson.D{{"$limit", n}})
+	return pb
+}
+
+func (pb *PipelineBuilder) Lookup(from, localField, foreignField, as string) *PipelineBuilder {
+	pb.stages = append(pb.stages, bson.D{{"$lookup", bson.D{
+		{"from", from},
+		{"localField", localField},
+		{"foreignField", foreignField},
+		{"as", as},
+	}}})
+
+	return pb
+}
+
+func (pb *PipelineBuilder) Unwind(path string, preserve bool) *PipelineBuilder {
+	pb.stages = append(pb.stages, bson.D{{"$unwind", bson.D{
+		{"path", path},
+		{"preserveNullAndEmptyArrays", preserve},
+	}}})
+
+	return pb
+}
+
+func (pb *PipelineBuilder) Project(fields bson.D) *PipelineBuilder {
+	pb.stages = append(pb.stages, bson.D{{"$project", fields}})
+	return pb
+}
+
+func (pb *PipelineBuilder) Build() mongo.Pipeline {
+	return pb.stages
 }

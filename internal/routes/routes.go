@@ -2,6 +2,7 @@ package routes
 
 import (
 	"github.com/edisss1/fiabesco-backend/handlers/auth"
+	"github.com/edisss1/fiabesco-backend/handlers/comments"
 	"github.com/edisss1/fiabesco-backend/handlers/mail"
 	"github.com/edisss1/fiabesco-backend/handlers/messages"
 	"github.com/edisss1/fiabesco-backend/handlers/portfolio"
@@ -57,10 +58,10 @@ func postRoutes(app *fiber.App) {
 	posts.Patch("/:_id/caption", post.UpdatePostCaption)
 	posts.Post("/like", post.LikePost)
 	posts.Get("/:postID", post.GetPost)
-	posts.Post("/:postID/comment", post.CommentPost)
-	posts.Get("/:postID/comments", post.GetComments)
-	posts.Patch("/:commentID/edit", post.EditComment)
-	posts.Delete("/:commentID", post.DeleteComment)
+	posts.Post("/:postID/comment", comments.CommentPost)
+	posts.Get("/:postID/comments", comments.GetComments)
+	posts.Patch("/:commentID/edit", comments.EditComment)
+	posts.Delete("/:commentID", comments.DeleteComment)
 }
 
 func messageRoutes(app *fiber.App) {
