@@ -7,6 +7,7 @@ import (
 	"github.com/edisss1/fiabesco-backend/handlers/messages"
 	"github.com/edisss1/fiabesco-backend/handlers/portfolio"
 	"github.com/edisss1/fiabesco-backend/handlers/post"
+	"github.com/edisss1/fiabesco-backend/handlers/repost"
 	"github.com/edisss1/fiabesco-backend/handlers/settings"
 	"github.com/edisss1/fiabesco-backend/handlers/social"
 	"github.com/edisss1/fiabesco-backend/handlers/uploads"
@@ -19,6 +20,7 @@ func Setup(app *fiber.App) {
 	authRoutes(app)
 	userRoutes(app)
 	postRoutes(app)
+	repostRoutes(app)
 	messageRoutes(app)
 	settingsRoutes(app)
 	portfolioRoutes(app)
@@ -62,6 +64,12 @@ func postRoutes(app *fiber.App) {
 	posts.Get("/:postID/comments", comments.GetComments)
 	posts.Patch("/:commentID/edit", comments.EditComment)
 	posts.Delete("/:commentID", comments.DeleteComment)
+}
+
+func repostRoutes(app *fiber.App) {
+	reposts := app.Group("/reposts", middleware.RequireJWT)
+
+	reposts.Post("/", repost.Repost)
 }
 
 func messageRoutes(app *fiber.App) {

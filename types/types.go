@@ -34,6 +34,7 @@ type Post struct {
 	Tags          []string           `json:"tags"`
 	LikesCount    uint32             `json:"likesCount" bson:"likesCount"`
 	CommentsCount uint32             `json:"commentsCount" bson:"commentsCount"`
+	RepostCount   uint32             `json:"repostCount" bson:"repostCount"`
 	LikedBy       []string           `json:"likedBy" bson:"likedBy"`
 	CommentedBy   []string           `json:"commentedBy" bson:"commentedBy"`
 	CreatedAt     time.Time          `json:"createdAt" bson:"createdAt"`
@@ -68,13 +69,6 @@ type Conversation struct {
 	LastMessage     Message              `json:"lastMessage" bson:"lastMessage"`
 	CreatedAt       time.Time            `json:"createdAt" bson:"createdAt"`
 	UpdatedAt       time.Time            `json:"updatedAt" bson:"updatedAt"`
-}
-
-type Repost struct {
-	ID        primitive.ObjectID `json:"id,omitempty" bson:"id"`
-	PostID    primitive.ObjectID `json:"postID" bson:"postID"`
-	UserID    primitive.ObjectID `json:"userID" bson:"userID"`
-	CreatedAt time.Time          `json:"createdAt" bson:"createdAt"`
 }
 
 type Like struct {
@@ -142,4 +136,13 @@ type PortfolioContactInfo struct {
 	DribbbleProfileLink   string `json:"dribbbleProfileLink" bson:"dribbbleProfileLink"`
 	PinterestProfileLink  string `json:"pinterestProfileLink" bson:"pinterestProfileLink"`
 	ArtStationProfileLink string `json:"artStationProfileLink" bson:"artStationProfileLink"`
+}
+
+type Repost struct {
+	ID            primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
+	RepostedBy    primitive.ObjectID `json:"repostedBy" bson:"repostedBy"`
+	PostID        primitive.ObjectID `json:"postID" bson:"postID"`
+	RepostCaption string             `json:"repostCaption" bson:"repostCaption"`
+	CreatedAt     time.Time          `json:"createdAt" bson:"createdAt"`
+	UpdatedAt     time.Time          `json:"updatedAt" bson:"updatedAt"`
 }
