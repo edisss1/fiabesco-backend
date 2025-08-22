@@ -310,3 +310,58 @@ func GetConversations(c *fiber.Ctx) error {
 
 	return c.Status(200).JSON(conversations)
 }
+
+// GetMessage will be primarily used to get a single message that is being replied to and not present
+// in the loaded conversation on the frontend
+func GetMessage(c *fiber.Ctx) error {
+	messagesCollection = db.Database.Collection("messages")
+	id := c.Params("messageID")
+	messageID, err := utils.ParseHexID(id)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid ID")
+	}
+
+	filter := bson.M{"_id": messageID}
+	var message types.Message
+
+	err = messagesCollection.FindOne(context.Background(), filter).Decode(&message)
+	if err != nil {
+		return utils.RespondWithError(c, 404, "Message not found")
+	}
+
+	return c.Status(200).JSON(message)
+}
+
+func SendReply(c *fiber.Ctx) error {
+	var body struct {
+		Content string `json:"content"`
+		ReplyTo string `json:"replyTo"`
+	}
+
+	if err := c.BodyParser(&body); err != nil {
+		return utils.RespondWithError(c, 400, "Invalid request body")
+	}
+
+	conversationIDParam := c.Params("conversationID")
+
+	senderID, err := utils.GetUserID(c)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid user ID")
+	}
+	conversationID, err := utils.ParseHexID(conversationIDParam)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid conversation ID")
+	}
+
+	replyTo, err := utils.ParseHexID(body.ReplyTo)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Invalid reply to ID")
+	}
+
+	reply, err := helpers.SaveReply(senderID, conversationID, body.Content, replyTo)
+	if err != nil {
+		return utils.RespondWithError(c, 400, "Error sending reply")
+	}
+
+	return c.Status(200).JSON(fiber.Map{"newMessage": reply})
+}

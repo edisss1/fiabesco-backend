@@ -48,6 +48,45 @@ func SaveMessage(senderID, conversationID primitive.ObjectID, content string) (t
 	return message, nil
 }
 
+func SaveReply(senderID, conversationID primitive.ObjectID, content string, replyTo primitive.ObjectID) (types.Message, error) {
+	reply := types.Message{
+		SenderID:       senderID,
+		ConversationID: conversationID,
+		Content:        content,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+		Read:           false,
+		ReplyTo:        replyTo,
+		IsReply:        true,
+		IsEdited:       false,
+	}
+
+	messagesCollection := db.Database.Collection("messages")
+	conversationsCollection := db.Database.Collection("conversations")
+
+	count, err := conversationsCollection.CountDocuments(context.Background(), bson.M{"_id": conversationID})
+	if err != nil || count == 0 {
+		return types.Message{}, errors.New("conversation not found")
+	}
+
+	res, err := messagesCollection.InsertOne(context.Background(), reply)
+	if err != nil {
+		return types.Message{}, err
+	}
+	reply.ID = res.InsertedID.(primitive.ObjectID)
+
+	filter := bson.M{"_id": conversationID}
+	update := bson.M{"$set": bson.M{"lastMessage": reply}}
+
+	_, err = conversationsCollection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return types.Message{}, err
+	}
+
+	return reply, nil
+
+}
+
 func SaveEditedMessage(messageID primitive.ObjectID, content string, conversationID primitive.ObjectID, senderID primitive.ObjectID) (types.Message, error) {
 	messagesCollection := db.Database.Collection("messages")
 	conversationsCollection := db.Database.Collection("conversations")

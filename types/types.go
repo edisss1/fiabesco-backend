@@ -51,6 +51,8 @@ type Message struct {
 	CreatedAt      time.Time          `json:"createdAt" bson:"createdAt"`
 	UpdatedAt      time.Time          `json:"updatedAt" bson:"updatedAt"`
 	IsEdited       bool               `json:"isEdited" bson:"isEdited"`
+	IsReply        bool               `json:"isReply" bson:"isReply"`
+	ReplyTo        primitive.ObjectID `json:"replyTo" bson:"replyTo"`
 }
 
 type Participant struct {
