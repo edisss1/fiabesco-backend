@@ -10,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"log"
 	"sync"
+	"time"
 )
 
 var clients = make(map[string]*websocket.Conn)
@@ -23,6 +24,13 @@ type BaseWSMessage struct {
 type SendMessagePayload struct {
 	SenderID       string `json:"senderID"`
 	RecipientID    string `json:"recipientID"`
+	ConversationID string `json:"conversationID"`
+	Content        string `json:"content"`
+}
+
+type SendReplyPayload struct {
+	SenderID       string `json:"senderID"`
+	ReplyTo        string `json:"replyTo"`
 	ConversationID string `json:"conversationID"`
 	Content        string `json:"content"`
 }
@@ -203,6 +211,72 @@ func HandleWS(conn *websocket.Conn) {
 				log.Println("Error updating user status: ", err)
 				continue
 			}
+
+		case "send_reply":
+			var payload SendReplyPayload
+
+			if err := json.Unmarshal(base.Data, &payload); err != nil {
+				log.Println("Unmarshal error: ", err)
+				continue
+			}
+
+			senderID, err := utils.ParseHexID(payload.SenderID)
+			if err != nil {
+				log.Println("Invalid senderID: ", err)
+				continue
+			}
+			conversationID, err := utils.ParseHexID(payload.ConversationID)
+			if err != nil {
+				log.Println("Invalid conversationID: ", err)
+				continue
+			}
+			replyTo, err := utils.ParseHexID(payload.ReplyTo)
+			if err != nil {
+				log.Println("Invalid replyTo: ", err)
+				continue
+			}
+			message, err := helpers.SaveReply(senderID, conversationID, payload.Content, replyTo)
+			if err != nil {
+				log.Println("Error saving reply: ", err)
+				continue
+			}
+
+			log.Printf(
+				"Reply saved: ID=%s, ConversationID=%s, SenderID=%s, Content=%q, Files=%v, Read=%v, CreatedAt=%s, UpdatedAt=%s, IsEdited=%v, IsReply=%v, ReplyTo=%s",
+				message.ID.Hex(),
+				message.ConversationID.Hex(),
+				message.SenderID.Hex(),
+				message.Content,
+				message.Files,
+				message.Read,
+				message.CreatedAt.Format(time.RFC3339),
+				message.UpdatedAt.Format(time.RFC3339),
+				message.IsEdited,
+				message.IsReply,
+				message.ReplyTo.Hex(),
+			)
+
+			conversation, err := helpers.GetConversation(conversationID)
+			if err != nil {
+				log.Println("Error getting conversation: ", err)
+				continue
+			}
+
+			for _, user := range conversation.Participants {
+				if conn, ok := clients[user.ID.Hex()]; ok {
+					err = conn.WriteJSON(struct {
+						Type    string        `json:"type"`
+						Message types.Message `json:"message"`
+					}{
+						Type:    "conversations_update",
+						Message: message,
+					})
+					if err != nil {
+						log.Println("Error sending message to user: ", err)
+					}
+				}
+			}
+
 		default:
 			log.Printf("Unknown message type: %s\n", base.Type)
 
